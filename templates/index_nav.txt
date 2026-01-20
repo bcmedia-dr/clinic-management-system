@@ -1,0 +1,3 @@
+            <a href="/" class="nav-btn active">📋 診所管理</a>
+            <a href="/analytics" class="nav-btn">📊 統計分析</a>
+            <a href="/logout" class="nav-btn">🚪 登出</a>

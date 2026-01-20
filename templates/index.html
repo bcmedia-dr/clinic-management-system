@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bcmedia 診所管理系統</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            font-size: 32px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .nav {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-btn.active {
+            background: white;
+            color: #667eea;
+            border-color: white;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-logout {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card.total {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .stat-card.health-mall-yes {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .stat-card.health-mall-no {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .stat-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .stat-title {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-number {
+            font-size: 36px;
+            font-weight: 700;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        .filter-select {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Noto Sans TC', sans-serif;
+            background: white;
+            cursor: pointer;
+        }
+
+        .btn-add {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-export, .btn-import {
+            background: #4ade80;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-export:hover, .btn-import:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(74, 222, 128, 0.3);
+        }
+
+        .btn-import {
+            background: #fb923c;
+        }
+
+        .btn-import:hover {
+            box-shadow: 0 5px 15px rgba(251, 146, 60, 0.3);
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        th:nth-child(1) { width: 60px; }  /* 編號 */
+        th:nth-child(2) { width: 90px; }  /* 縣市 */
+        th:nth-child(3) { width: 90px; }  /* 區域 */
+        th:nth-child(4) { width: 150px; } /* 診所名稱 */
+        th:nth-child(5) { width: 150px; } /* 媒體項目 */
+        th:nth-child(6) { width: 140px; } /* 科別 */
+        th:nth-child(7) { width: 120px; } /* 電話 */
+        th:nth-child(8) { width: 100px; } /* 負責人 */
+        th:nth-child(9) { width: 180px; } /* 操作 */
+
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+        }
+
+        td:nth-child(3) { /* 診所名稱 */
+            font-weight: 600;
+        }
+
+        td:nth-child(4) { /* 科別 */
+            white-space: normal;
+            overflow: visible;
+        }
+
+        td:nth-child(5) { /* 地址 */
+            max-width: 280px;
+        }
+
+        /* 確保所有欄位都有適當的 tooltip */
+        td[title] {
+            cursor: help;
+        }
+
+        tbody tr {
+            transition: all 0.2s;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge.yes {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge.no {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .btn-edit, .btn-delete, .btn-detail {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            margin-right: 5px;
+            transition: all 0.2s;
+            white-space: nowrap;
+            min-width: 60px;
+            text-align: center;
+            color: white;
+        }
+
+        td:nth-child(5) { /* 媒體項目 */
+            white-space: normal;
+            overflow: visible;
+        }
+
+        td:nth-child(6) { /* 科別 */
+            white-space: normal;
+            overflow: visible;
+        }
+
+        td:nth-child(9) { /* 操作欄位 */
+            white-space: nowrap;
+        }
+
+        .btn-edit {
+            background: #4facfe;
+        }
+
+        .btn-edit:hover {
+            background: #3a8fd9;
+        }
+
+        .btn-delete {
+            background: #f5576c;
+        }
+
+        .btn-delete:hover {
+            background: #d63f52;
+        }
+
+        .btn-detail {
+            background: #4ade80;
+        }
+
+        .btn-detail:hover {
+            background: #22c55e;
+        }
+
+        .detail-row {
+            display: none;
+        }
+
+        .detail-row.active {
+            display: table-row;
+        }
+
+        .detail-content {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-left: 4px solid #4ade80;
+        }
+
+        .detail-content h4 {
+            margin-bottom: 12px;
+            color: #333;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .detail-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .detail-item label {
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-item span {
+            color: #111827;
+            font-size: 14px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: white;
+            max-width: 600px;
+            margin: 50px auto;
+            border-radius: 20px;
+            padding: 30px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .modal-header h2 {
+            font-size: 24px;
+            color: #333;
+        }
+
+        .close-btn {
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            background: none;
+            border: none;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 400;
+            cursor: pointer;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .specialty-tag {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin: 2px 2px 2px 0;
+            white-space: nowrap;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="header-left">
+                <div class="logo">🏥</div>
+                <h1>Bcmedia 診所管理系統</h1>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <span>👤</span>
+                    <span id="username"></span>
+                </div>
+                <button class="btn-logout" onclick="logout()">🚪 登出</button>
+            </div>
+        </div>
+        <div class="nav">
+            <a href="/" class="nav-btn active">📋 診所管理</a>
+            <a href="/analytics" class="nav-btn">📊 統計分析</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card total">
+                <div class="stat-icon">🏥</div>
+                <div class="stat-title">總診所數</div>
+                <div class="stat-number" id="totalClinics">0</div>
+            </div>
+            <div class="stat-card health-mall-yes">
+                <div class="stat-icon">✅</div>
+                <div class="stat-title">健康醫購</div>
+                <div class="stat-number" id="healthMallYes">0</div>
+            </div>
+            <div class="stat-card health-mall-no">
+                <div class="stat-icon">📊</div>
+                <div class="stat-title">非健康醫購</div>
+                <div class="stat-number" id="healthMallNo">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="controls-row">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="🔍 搜尋診所名稱、地址、負責人...">
+                </div>
+                <select class="filter-select" id="filterRegion">
+                    <option value="">請選擇地區</option>
+                    <option value="臺北市">臺北市</option>
+                    <option value="新北市">新北市</option>
+                    <option value="桃園市">桃園市</option>
+                    <option value="臺中市">臺中市</option>
+                    <option value="臺南市">臺南市</option>
+                    <option value="高雄市">高雄市</option>
+                    <option value="基隆市">基隆市</option>
+                    <option value="新竹市">新竹市</option>
+                    <option value="嘉義市">嘉義市</option>
+                    <option value="宜蘭縣">宜蘭縣</option>
+                    <option value="新竹縣">新竹縣</option>
+                    <option value="苗栗縣">苗栗縣</option>
+                    <option value="彰化縣">彰化縣</option>
+                    <option value="南投縣">南投縣</option>
+                    <option value="雲林縣">雲林縣</option>
+                    <option value="嘉義縣">嘉義縣</option>
+                    <option value="屏東縣">屏東縣</option>
+                    <option value="花蓮縣">花蓮縣</option>
+                    <option value="臺東縣">臺東縣</option>
+                    <option value="澎湖縣">澎湖縣</option>
+                    <option value="金門縣">金門縣</option>
+                    <option value="連江縣">連江縣</option>
+                </select>
+                <select class="filter-select" id="filterSpecialty">
+                    <option value="">請選擇科別</option>
+                    <option value="小兒科">小兒科</option>
+                    <option value="家醫科">家醫科</option>
+                    <option value="耳鼻喉科">耳鼻喉科</option>
+                    <option value="內科">內科</option>
+                    <option value="外科">外科</option>
+                    <option value="婦產科">婦產科</option>
+                    <option value="皮膚科">皮膚科</option>
+                    <option value="泌尿科">泌尿科</option>
+                    <option value="精神科">精神科</option>
+                    <option value="中醫">中醫</option>
+                </select>
+                <button class="btn-add" onclick="showAddModal()">➕ 新增診所</button>
+                <button class="btn-export" onclick="exportData()">📥 匯出 Excel</button>
+                <button class="btn-import" onclick="showImportModal()">📤 匯入 Excel</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>編號</th>
+                        <th>縣市</th>
+                        <th>區域</th>
+                        <th>診所名稱</th>
+                        <th>媒體項目</th>
+                        <th>科別</th>
+                        <th>電話</th>
+                        <th>負責人</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="clinicsTable">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal省略，與之前相同 -->
+    <div class="modal" id="clinicModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">新增診所</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="clinicForm">
+                <input type="hidden" id="clinicId">
+                
+                <div class="form-group">
+                    <label>縣市 *</label>
+                    <select id="region" required>
+                        <option value="">請選擇縣市</option>
+                        <option value="臺北市">臺北市</option>
+                        <option value="新北市">新北市</option>
+                        <option value="桃園市">桃園市</option>
+                        <option value="臺中市">臺中市</option>
+                        <option value="臺南市">臺南市</option>
+                        <option value="高雄市">高雄市</option>
+                        <option value="基隆市">基隆市</option>
+                        <option value="新竹市">新竹市</option>
+                        <option value="嘉義市">嘉義市</option>
+                        <option value="宜蘭縣">宜蘭縣</option>
+                        <option value="新竹縣">新竹縣</option>
+                        <option value="苗栗縣">苗栗縣</option>
+                        <option value="彰化縣">彰化縣</option>
+                        <option value="南投縣">南投縣</option>
+                        <option value="雲林縣">雲林縣</option>
+                        <option value="嘉義縣">嘉義縣</option>
+                        <option value="屏東縣">屏東縣</option>
+                        <option value="花蓮縣">花蓮縣</option>
+                        <option value="臺東縣">臺東縣</option>
+                        <option value="澎湖縣">澎湖縣</option>
+                        <option value="金門縣">金門縣</option>
+                        <option value="連江縣">連江縣</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>區域 *</label>
+                    <input type="text" id="district" required placeholder="例如：大安區、板橋區">
+                </div>
+
+                <div class="form-group">
+                    <label>診所名稱 *</label>
+                    <input type="text" id="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label>媒體項目 *（可複選）</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="藥袋" class="media-item"> 藥袋</label>
+                        <label><input type="checkbox" value="海報" class="media-item"> 海報</label>
+                        <label><input type="checkbox" value="櫃檯" class="media-item"> 櫃檯</label>
+                        <label><input type="checkbox" value="派樣" class="media-item"> 派樣</label>
+                        <label><input type="checkbox" value="全部" class="media-item" id="mediaAll"> 全部</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>科別 *（可複選）</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="小兒科"> 小兒科</label>
+                        <label><input type="checkbox" value="家醫科"> 家醫科</label>
+                        <label><input type="checkbox" value="耳鼻喉科"> 耳鼻喉科</label>
+                        <label><input type="checkbox" value="內科"> 內科</label>
+                        <label><input type="checkbox" value="外科"> 外科</label>
+                        <label><input type="checkbox" value="婦產科"> 婦產科</label>
+                        <label><input type="checkbox" value="皮膚科"> 皮膚科</label>
+                        <label><input type="checkbox" value="泌尿科"> 泌尿科</label>
+                        <label><input type="checkbox" value="精神科"> 精神科</label>
+                        <label><input type="checkbox" value="中醫"> 中醫</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>地址</label>
+                    <input type="text" id="address" placeholder="例如：台北市大安區信義路三段123號">
+                </div>
+
+                <div class="form-group">
+                    <label>電話 *</label>
+                    <input type="text" id="phone" required>
+                </div>
+
+                <div class="form-group">
+                    <label>負責人 *</label>
+                    <input type="text" id="contactPerson" required>
+                </div>
+
+                <div class="form-group">
+                    <label>地址</label>
+                    <input type="text" id="address" placeholder="例如：台北市大安區信義路三段123號">
+                </div>
+
+                <div class="form-group">
+                    <label>營業時間</label>
+                    <textarea id="businessHours" placeholder="例如：週一至週五 09:00-21:00"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>備註</label>
+                    <textarea id="note" placeholder="請輸入備註資訊..."></textarea>
+                </div>
+
+                <button type="submit" class="btn-submit">儲存</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentEditId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadClinics();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', loadClinics);
+            document.getElementById('filterRegion').addEventListener('change', loadClinics);
+            document.getElementById('filterSpecialty').addEventListener('change', loadClinics);
+            document.getElementById('clinicForm').addEventListener('submit', handleSubmit);
+            
+            // 媒體項目「全部」的邏輯
+            const mediaAllCheckbox = document.getElementById('mediaAll');
+            if (mediaAllCheckbox) {
+                mediaAllCheckbox.addEventListener('change', function() {
+                    const mediaItems = document.querySelectorAll('.media-item:not(#mediaAll)');
+                    if (this.checked) {
+                        mediaItems.forEach(item => item.checked = true);
+                    }
+                });
+                
+                // 當其他媒體項目取消選中時，取消「全部」
+                document.querySelectorAll('.media-item:not(#mediaAll)').forEach(item => {
+                    item.addEventListener('change', function() {
+                        if (!this.checked) {
+                            mediaAllCheckbox.checked = false;
+                        } else {
+                            // 檢查是否所有項目都已選中
+                            const allChecked = Array.from(document.querySelectorAll('.media-item:not(#mediaAll)')).every(cb => cb.checked);
+                            if (allChecked) {
+                                mediaAllCheckbox.checked = true;
+                            }
+                        }
+                    });
+                });
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                document.getElementById('totalClinics').textContent = data.total;
+                document.getElementById('healthMallYes').textContent = data.health_mall_yes;
+                document.getElementById('healthMallNo').textContent = data.health_mall_no;
+            } catch (error) {
+                console.error('載入統計資料失敗:', error);
+            }
+        }
+
+        async function loadClinics() {
+            const search = document.getElementById('searchInput').value;
+            const region = document.getElementById('filterRegion').value;
+            const specialty = document.getElementById('filterSpecialty').value;
+
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (region) params.append('region', region);
+            if (specialty) params.append('specialty', specialty);
+
+            try {
+                const response = await fetch(`/api/clinics?${params}`);
+                const clinics = await response.json();
+                displayClinics(clinics);
+            } catch (error) {
+                console.error('載入診所資料失敗:', error);
+            }
+        }
+
+        function displayClinics(clinics) {
+            const tbody = document.getElementById('clinicsTable');
+            tbody.innerHTML = '';
+
+            clinics.forEach((clinic, index) => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-clinic-id', clinic.id);
+                
+                // 自動編號（從1開始）
+                const displayNumber = index + 1;
+                
+                const specialties = clinic.specialties ? clinic.specialties.split(',').map(s => 
+                    `<span class="specialty-tag">${s.trim()}</span>`
+                ).join(' ') : '';
+
+                const mediaItems = clinic.media_items ? clinic.media_items.split(',').map(m => 
+                    `<span class="specialty-tag" style="background: #fff3cd; color: #856404;">${m.trim()}</span>`
+                ).join(' ') : '無';
+
+                row.innerHTML = `
+                    <td>${displayNumber}</td>
+                    <td>${clinic.region || ''}</td>
+                    <td>${clinic.district || ''}</td>
+                    <td title="${clinic.name}">${clinic.name}</td>
+                    <td>${mediaItems}</td>
+                    <td>${specialties}</td>
+                    <td>${clinic.phone || ''}</td>
+                    <td>${clinic.contact_person || ''}</td>
+                    <td>
+                        <button class="btn-edit" onclick="editClinic(${clinic.id})">編輯</button>
+                        <button class="btn-delete" onclick="deleteClinic(${clinic.id})">刪除</button>
+                        <button class="btn-detail" onclick="toggleDetail(${clinic.id})">詳細</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+
+                // 創建詳細資訊行
+                const detailRow = document.createElement('tr');
+                detailRow.className = 'detail-row';
+                detailRow.setAttribute('data-detail-for', clinic.id);
+                detailRow.innerHTML = `
+                    <td colspan="9">
+                        <div class="detail-content">
+                            <h4>詳細資訊</h4>
+                            <div class="detail-info">
+                                <div class="detail-item">
+                                    <label>地址</label>
+                                    <span>${clinic.address || '未設定'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>營業時間</label>
+                                    <span>${clinic.business_hours || '未設定'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>備註</label>
+                                    <span>${clinic.note || '無備註'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(detailRow);
+            });
+        }
+
+        function toggleDetail(clinicId) {
+            const detailRow = document.querySelector(`tr[data-detail-for="${clinicId}"]`);
+            if (!detailRow) return;
+
+            // 關閉其他已展開的詳細資訊
+            document.querySelectorAll('.detail-row.active').forEach(row => {
+                if (row !== detailRow) {
+                    row.classList.remove('active');
+                }
+            });
+
+            // 切換當前詳細資訊的顯示狀態
+            detailRow.classList.toggle('active');
+        }
+
+        function showAddModal() {
+            currentEditId = null;
+            document.getElementById('modalTitle').textContent = '新增診所';
+            document.getElementById('clinicForm').reset();
+            document.getElementById('clinicId').value = '';
+            document.getElementById('address').value = '';
+            document.querySelectorAll('.checkbox-group input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            document.getElementById('clinicModal').style.display = 'block';
+        }
+
+        async function editClinic(id) {
+            currentEditId = id;
+            document.getElementById('modalTitle').textContent = '編輯診所';
+
+            try {
+                const response = await fetch(`/api/clinics?search=`);
+                const clinics = await response.json();
+                const clinic = clinics.find(c => c.id === id);
+
+                if (clinic) {
+                    document.getElementById('clinicId').value = clinic.id;
+                    document.getElementById('region').value = clinic.region || '';
+                    document.getElementById('district').value = clinic.district || '';
+                    document.getElementById('name').value = clinic.name || '';
+                    document.getElementById('address').value = clinic.address || '';
+                    document.getElementById('phone').value = clinic.phone || '';
+                    document.getElementById('contactPerson').value = clinic.contact_person || '';
+
+                    const specialties = clinic.specialties ? clinic.specialties.split(',').map(s => s.trim()) : [];
+                    document.querySelectorAll('.checkbox-group input[type="checkbox"]:not(.media-item)').forEach(cb => {
+                        cb.checked = specialties.includes(cb.value);
+                    });
+
+                    const mediaItems = clinic.media_items ? clinic.media_items.split(',').map(m => m.trim()) : [];
+                    document.querySelectorAll('.media-item').forEach(cb => {
+                        cb.checked = mediaItems.includes(cb.value);
+                    });
+
+                    document.getElementById('clinicModal').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('載入診所資料失敗:', error);
+                alert('載入診所資料失敗');
+            }
+        }
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+
+            const selectedSpecialties = Array.from(
+                document.querySelectorAll('.checkbox-group input[type="checkbox"]:not(.media-item):checked')
+            ).map(cb => cb.value).join(',');
+
+            const selectedMediaItems = Array.from(
+                document.querySelectorAll('.media-item:checked')
+            ).map(cb => cb.value).join(',');
+
+            const clinicData = {
+                region: document.getElementById('region').value,
+                district: document.getElementById('district').value,
+                name: document.getElementById('name').value,
+                media_items: selectedMediaItems,
+                specialties: selectedSpecialties,
+                address: document.getElementById('address').value,
+                phone: document.getElementById('phone').value,
+                contact_person: document.getElementById('contactPerson').value
+            };
+
+            try {
+                const id = document.getElementById('clinicId').value;
+                const url = id ? `/api/clinics/${id}` : '/api/clinics';
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(clinicData)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadStats();
+                    loadClinics();
+                } else {
+                    const error = await response.json();
+                    alert(error.error || '儲存失敗');
+                }
+            } catch (error) {
+                console.error('儲存失敗:', error);
+                alert('儲存失敗，請稍後再試');
+            }
+        }
+
+        async function deleteClinic(id) {
+            if (!confirm('確定要刪除這個診所嗎？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/clinics/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadStats();
+                    loadClinics();
+                } else {
+                    const error = await response.json();
+                    alert(error.error || '刪除失敗');
+                }
+            } catch (error) {
+                console.error('刪除失敗:', error);
+                alert('刪除失敗，請稍後再試');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('clinicModal').style.display = 'none';
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('clinicModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+            const importModal = document.getElementById('importModal');
+            if (event.target == importModal) {
+                closeImportModal();
+            }
+        }
+
+        // 匯出功能
+        function exportData() {
+            const search = document.getElementById('searchInput').value;
+            const region = document.getElementById('filterRegion').value;
+            const specialty = document.getElementById('filterSpecialty').value;
+            const mediaItem = document.getElementById('filterMediaItem') ? document.getElementById('filterMediaItem').value : '';
+            
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (region) params.append('region', region);
+            if (specialty) params.append('specialty', specialty);
+            if (mediaItem) params.append('media_item', mediaItem);
+            
+            // 產生下載連結
+            const url = `/api/export?${params}`;
+            window.location.href = url;
+        }
+
+        // 顯示匯入 Modal
+        function showImportModal() {
+            document.getElementById('importModal').style.display = 'block';
+            document.getElementById('importFile').value = '';
+            document.getElementById('importResult').style.display = 'none';
+        }
+
+        // 關閉匯入 Modal
+        function closeImportModal() {
+            document.getElementById('importModal').style.display = 'none';
+        }
+
+        // 上傳檔案
+        async function uploadFile() {
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('請選擇檔案');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('importResult');
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
+                            <strong>✅ 匯入成功</strong><br>
+                            成功匯入 ${result.imported} 筆資料
+                            ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                    
+                    // 重新載入資料
+                    setTimeout(() => {
+                        closeImportModal();
+                        loadClinics();
+                        loadStats();
+                    }, 2000);
+                } else {
+                    resultDiv.innerHTML = `
+                        <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px;">
+                            <strong>❌ 匯入失敗</strong><br>
+                            ${result.error}
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                alert('匯入失敗：' + error);
+            }
+        }
+    </script>
+
+    <!-- 匯入 Modal -->
+    <div class="modal" id="importModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📤 匯入診所資料</h2>
+                <button class="close-btn" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <p style="color: #666; font-size: 14px;">
+                    📋 檔案格式要求：<br>
+                    • 必須是 .xlsx 格式<br>
+                    • 欄位順序：縣市、區域、診所名稱、科別、地址、電話、負責人<br>
+                    • 診所名稱為必填欄位
+                </p>
+            </div>
+            <div class="form-group">
+                <label>選擇 Excel 檔案</label>
+                <input type="file" id="importFile" accept=".xlsx" style="padding: 10px; border: 2px dashed #e0e0e0; border-radius: 8px;">
+            </div>
+            <button class="btn-submit" onclick="uploadFile()">開始匯入</button>
+            <div id="importResult" style="margin-top: 20px; display: none;"></div>
+        </div>
+    </div>
+</body>
+</html>
