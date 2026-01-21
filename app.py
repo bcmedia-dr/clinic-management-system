@@ -38,6 +38,11 @@ class Clinic(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+# 自動建立表格
+@app.before_first_request
+def create_tables():
+    db.create_all()
+
 # 登入路由
 @app.route('/')
 def index():
@@ -514,10 +519,6 @@ def init_database_web():
             </body>
             </html>
         '''
-
-# 確保資料表存在
-with app.app_context():
-    db.create_all()
 
 if __name__ == '__main__':
     with app.app_context():
