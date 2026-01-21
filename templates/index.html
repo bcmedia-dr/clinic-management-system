@@ -240,17 +240,47 @@
             box-shadow: 0 5px 15px rgba(251, 146, 60, 0.3);
         }
 
+        .btn-delete-batch {
+            background: #f5576c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-delete-batch:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.3);
+        }
+
+        .checkbox-select {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
         .table-container {
             background: white;
             border-radius: 15px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            overflow: hidden;
+            overflow-x: auto; /* 允許橫向滾動以顯示所有列 */
+            overflow-y: visible;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            min-width: 1350px; /* 確保表格有足夠寬度 */
+        }
+        
+        .table-container {
+            overflow-x: auto; /* 允許橫向滾動 */
         }
 
         thead {
@@ -266,15 +296,18 @@
             white-space: nowrap;
         }
 
-        th:nth-child(1) { width: 60px; }  /* 編號 */
-        th:nth-child(2) { width: 90px; }  /* 縣市 */
-        th:nth-child(3) { width: 90px; }  /* 區域 */
-        th:nth-child(4) { width: 150px; } /* 診所名稱 */
-        th:nth-child(5) { width: 150px; } /* 媒體項目 */
+        th:nth-child(1) { width: 50px; }  /* 選擇 */
+        th:nth-child(2) { width: 50px; }  /* 編號 */
+        th:nth-child(3) { width: 70px; }  /* 縣市 */
+        th:nth-child(4) { width: 70px; }  /* 區域 */
+        th:nth-child(5) { width: 150px; } /* 診所名稱 */
         th:nth-child(6) { width: 140px; } /* 科別 */
         th:nth-child(7) { width: 120px; } /* 電話 */
         th:nth-child(8) { width: 100px; } /* 負責人 */
-        th:nth-child(9) { width: 180px; } /* 操作 */
+        th:nth-child(9) { width: 150px; } /* 媒體項目 */
+        th:nth-child(10) { width: 90px; }  /* 健康醫購 */
+        th:nth-child(11) { width: 70px; }  /* 百位 */
+        th:nth-child(12) { width: 150px; min-width: 150px; } /* 操作 */
 
         td {
             padding: 12px 10px;
@@ -285,17 +318,8 @@
             vertical-align: middle;
         }
 
-        td:nth-child(3) { /* 診所名稱 */
+        td:nth-child(4) { /* 診所名稱 */
             font-weight: 600;
-        }
-
-        td:nth-child(4) { /* 科別 */
-            white-space: normal;
-            overflow: visible;
-        }
-
-        td:nth-child(5) { /* 地址 */
-            max-width: 280px;
         }
 
         /* 確保所有欄位都有適當的 tooltip */
@@ -336,17 +360,14 @@
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
-            margin-right: 5px;
+            margin-right: 4px;
             transition: all 0.2s;
             white-space: nowrap;
-            min-width: 60px;
+            min-width: 55px;
             text-align: center;
             color: white;
-        }
-
-        td:nth-child(5) { /* 媒體項目 */
-            white-space: normal;
-            overflow: visible;
+            display: inline-block;
+            flex-shrink: 0;
         }
 
         td:nth-child(6) { /* 科別 */
@@ -354,8 +375,20 @@
             overflow: visible;
         }
 
-        td:nth-child(9) { /* 操作欄位 */
+        td:nth-child(9) { /* 媒體項目 */
+            white-space: normal;
+            overflow: visible;
+        }
+
+        td:nth-child(12) { /* 操作欄位 */
             white-space: nowrap;
+            overflow: visible;
+            padding: 12px 8px;
+        }
+        
+        /* 確保操作列按鈕容器有足夠空間 */
+        td:nth-child(12) button:last-child {
+            margin-right: 0;
         }
 
         .btn-edit {
@@ -571,6 +604,25 @@
             margin: 2px 2px 2px 0;
             white-space: nowrap;
         }
+        
+        .status-tag {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        
+        .status-tag.yes {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-tag.no {
+            background: #f8d7da;
+            color: #721c24;
+        }
 
     </style>
 </head>
@@ -658,6 +710,7 @@
                     <option value="中醫">中醫</option>
                 </select>
                 <button class="btn-add" onclick="showAddModal()">➕ 新增診所</button>
+                <button class="btn-delete-batch" onclick="deleteSelected()" id="btnDeleteBatch" style="display: none;">🗑️ 刪除選中</button>
                 <button class="btn-export" onclick="exportData()">📥 匯出 Excel</button>
                 <button class="btn-import" onclick="showImportModal()">📤 匯入 Excel</button>
             </div>
@@ -667,14 +720,17 @@
             <table>
                 <thead>
                     <tr>
+                        <th><input type="checkbox" id="selectAll" class="checkbox-select" title="全選"></th>
                         <th>編號</th>
                         <th>縣市</th>
                         <th>區域</th>
                         <th>診所名稱</th>
-                        <th>媒體項目</th>
                         <th>科別</th>
                         <th>電話</th>
                         <th>負責人</th>
+                        <th>媒體項目</th>
+                        <th>健康醫購</th>
+                        <th>百位</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -734,14 +790,18 @@
                 </div>
 
                 <div class="form-group">
-                    <label>媒體項目 *（可複選）</label>
-                    <div class="checkbox-group">
-                        <label><input type="checkbox" value="藥袋" class="media-item"> 藥袋</label>
-                        <label><input type="checkbox" value="海報" class="media-item"> 海報</label>
-                        <label><input type="checkbox" value="櫃檯" class="media-item"> 櫃檯</label>
-                        <label><input type="checkbox" value="派樣" class="media-item"> 派樣</label>
-                        <label><input type="checkbox" value="全部" class="media-item" id="mediaAll"> 全部</label>
-                    </div>
+                    <label>地址</label>
+                    <input type="text" id="address" placeholder="例如：台北市大安區信義路三段123號">
+                </div>
+
+                <div class="form-group">
+                    <label>電話 *</label>
+                    <input type="text" id="phone" required>
+                </div>
+
+                <div class="form-group">
+                    <label>負責人 *</label>
+                    <input type="text" id="contactPerson" required>
                 </div>
 
                 <div class="form-group">
@@ -761,23 +821,30 @@
                 </div>
 
                 <div class="form-group">
-                    <label>地址</label>
-                    <input type="text" id="address" placeholder="例如：台北市大安區信義路三段123號">
+                    <label>媒體項目 *（可複選）</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="藥袋" class="media-item"> 藥袋</label>
+                        <label><input type="checkbox" value="海報" class="media-item"> 海報</label>
+                        <label><input type="checkbox" value="櫃檯" class="media-item"> 櫃檯</label>
+                        <label><input type="checkbox" value="派樣" class="media-item"> 派樣</label>
+                        <label><input type="checkbox" value="全選" class="media-item" id="mediaAll"> 全選</label>
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label>電話 *</label>
-                    <input type="text" id="phone" required>
+                    <label>健康醫購 *</label>
+                    <select id="healthMall" required>
+                        <option value="否">否</option>
+                        <option value="是">是</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
-                    <label>負責人 *</label>
-                    <input type="text" id="contactPerson" required>
-                </div>
-
-                <div class="form-group">
-                    <label>地址</label>
-                    <input type="text" id="address" placeholder="例如：台北市大安區信義路三段123號">
+                    <label>百位 *</label>
+                    <select id="hundredPosition" required>
+                        <option value="否">否</option>
+                        <option value="是">是</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -810,7 +877,19 @@
             document.getElementById('filterSpecialty').addEventListener('change', loadClinics);
             document.getElementById('clinicForm').addEventListener('submit', handleSubmit);
             
-            // 媒體項目「全部」的邏輯
+            // 全選功能（使用事件委派，因為表格是動態生成的）
+            document.addEventListener('change', function(e) {
+                if (e.target.id === 'selectAll') {
+                    const checkboxes = document.querySelectorAll('.clinic-checkbox');
+                    checkboxes.forEach(cb => cb.checked = e.target.checked);
+                    updateDeleteButton();
+                } else if (e.target.classList.contains('clinic-checkbox')) {
+                    updateSelectAllState();
+                    updateDeleteButton();
+                }
+            });
+            
+            // 媒體項目「全選」的邏輯
             const mediaAllCheckbox = document.getElementById('mediaAll');
             if (mediaAllCheckbox) {
                 mediaAllCheckbox.addEventListener('change', function() {
@@ -820,7 +899,7 @@
                     }
                 });
                 
-                // 當其他媒體項目取消選中時，取消「全部」
+                // 當其他媒體項目取消選中時，取消「全選」
                 document.querySelectorAll('.media-item:not(#mediaAll)').forEach(item => {
                     item.addEventListener('change', function() {
                         if (!this.checked) {
@@ -834,6 +913,74 @@
                         }
                     });
                 });
+            }
+        }
+        
+        function updateSelectAllState() {
+            const checkboxes = document.querySelectorAll('.clinic-checkbox');
+            const selectAll = document.getElementById('selectAll');
+            if (checkboxes.length === 0) {
+                if (selectAll) selectAll.checked = false;
+                return;
+            }
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+            if (selectAll) {
+                selectAll.checked = allChecked;
+                selectAll.indeterminate = someChecked && !allChecked;
+            }
+        }
+        
+        function updateDeleteButton() {
+            const checkedBoxes = document.querySelectorAll('.clinic-checkbox:checked');
+            const deleteBtn = document.getElementById('btnDeleteBatch');
+            if (deleteBtn) {
+                if (checkedBoxes.length > 0) {
+                    deleteBtn.style.display = 'inline-block';
+                } else {
+                    deleteBtn.style.display = 'none';
+                }
+            }
+        }
+        
+        async function deleteSelected() {
+            const checkedBoxes = document.querySelectorAll('.clinic-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('請選擇要刪除的診所');
+                return;
+            }
+            
+            const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute('data-clinic-id'));
+            const count = selectedIds.length;
+            
+            if (!confirm(`確定要刪除選中的 ${count} 筆診所資料嗎？此操作無法復原。`)) {
+                return;
+            }
+            
+            try {
+                // 批量刪除
+                const deletePromises = selectedIds.map(id => 
+                    fetch(`/api/clinics/${id}`, { method: 'DELETE' })
+                );
+                
+                const results = await Promise.all(deletePromises);
+                const failed = results.filter(r => !r.ok);
+                
+                if (failed.length > 0) {
+                    alert(`刪除完成，但有 ${failed.length} 筆資料刪除失敗`);
+                } else {
+                    alert(`成功刪除 ${count} 筆資料`);
+                }
+                
+                // 重新載入資料
+                loadStats();
+                loadClinics();
+                const selectAll = document.getElementById('selectAll');
+                if (selectAll) selectAll.checked = false;
+                updateDeleteButton();
+            } catch (error) {
+                console.error('批量刪除失敗:', error);
+                alert('批量刪除失敗，請稍後再試');
             }
         }
 
@@ -887,18 +1034,25 @@
                     `<span class="specialty-tag" style="background: #fff3cd; color: #856404;">${m.trim()}</span>`
                 ).join(' ') : '無';
 
+                const healthMallValue = clinic.health_mall || '否';
+                const hundredPositionValue = clinic.hundred_position || '否';
+                const healthMallTag = `<span class="status-tag ${healthMallValue === '是' ? 'yes' : 'no'}">${healthMallValue}</span>`;
+                const hundredPositionTag = `<span class="status-tag ${hundredPositionValue === '是' ? 'yes' : 'no'}">${hundredPositionValue}</span>`;
+                
                 row.innerHTML = `
+                    <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${clinic.id}"></td>
                     <td>${displayNumber}</td>
                     <td>${clinic.region || ''}</td>
                     <td>${clinic.district || ''}</td>
                     <td title="${clinic.name}">${clinic.name}</td>
-                    <td>${mediaItems}</td>
                     <td>${specialties}</td>
                     <td>${clinic.phone || ''}</td>
                     <td>${clinic.contact_person || ''}</td>
+                    <td>${mediaItems}</td>
+                    <td>${healthMallTag}</td>
+                    <td>${hundredPositionTag}</td>
                     <td>
                         <button class="btn-edit" onclick="editClinic(${clinic.id})">編輯</button>
-                        <button class="btn-delete" onclick="deleteClinic(${clinic.id})">刪除</button>
                         <button class="btn-detail" onclick="toggleDetail(${clinic.id})">詳細</button>
                     </td>
                 `;
@@ -909,7 +1063,7 @@
                 detailRow.className = 'detail-row';
                 detailRow.setAttribute('data-detail-for', clinic.id);
                 detailRow.innerHTML = `
-                    <td colspan="9">
+                    <td colspan="12">
                         <div class="detail-content">
                             <h4>詳細資訊</h4>
                             <div class="detail-info">
@@ -974,9 +1128,13 @@
                     document.getElementById('region').value = clinic.region || '';
                     document.getElementById('district').value = clinic.district || '';
                     document.getElementById('name').value = clinic.name || '';
+                    document.getElementById('healthMall').value = clinic.health_mall || '否';
+                    document.getElementById('hundredPosition').value = clinic.hundred_position || '否';
                     document.getElementById('address').value = clinic.address || '';
                     document.getElementById('phone').value = clinic.phone || '';
                     document.getElementById('contactPerson').value = clinic.contact_person || '';
+                    document.getElementById('businessHours').value = clinic.business_hours || '';
+                    document.getElementById('note').value = clinic.note || '';
 
                     const specialties = clinic.specialties ? clinic.specialties.split(',').map(s => s.trim()) : [];
                     document.querySelectorAll('.checkbox-group input[type="checkbox"]:not(.media-item)').forEach(cb => {
@@ -984,9 +1142,15 @@
                     });
 
                     const mediaItems = clinic.media_items ? clinic.media_items.split(',').map(m => m.trim()) : [];
-                    document.querySelectorAll('.media-item').forEach(cb => {
-                        cb.checked = mediaItems.includes(cb.value);
+                    // 如果包含「全部」或「全選」，則選中所有項目
+                    const hasAll = mediaItems.includes('全部') || mediaItems.includes('全選');
+                    document.querySelectorAll('.media-item:not(#mediaAll)').forEach(cb => {
+                        cb.checked = hasAll || mediaItems.includes(cb.value);
                     });
+                    // 如果所有項目都被選中，則選中「全選」
+                    if (hasAll) {
+                        document.getElementById('mediaAll').checked = true;
+                    }
 
                     document.getElementById('clinicModal').style.display = 'block';
                 }
@@ -1005,17 +1169,23 @@
 
             const selectedMediaItems = Array.from(
                 document.querySelectorAll('.media-item:checked')
-            ).map(cb => cb.value).join(',');
+            )
+            .filter(cb => cb.value !== '全選') // 排除「全選」選項，不提交到資料庫
+            .map(cb => cb.value).join(',');
 
             const clinicData = {
                 region: document.getElementById('region').value,
                 district: document.getElementById('district').value,
                 name: document.getElementById('name').value,
+                health_mall: document.getElementById('healthMall').value,
+                hundred_position: document.getElementById('hundredPosition').value,
                 media_items: selectedMediaItems,
                 specialties: selectedSpecialties,
                 address: document.getElementById('address').value,
                 phone: document.getElementById('phone').value,
-                contact_person: document.getElementById('contactPerson').value
+                contact_person: document.getElementById('contactPerson').value,
+                business_hours: document.getElementById('businessHours').value,
+                note: document.getElementById('note').value
             };
 
             try {
@@ -1036,12 +1206,13 @@
                     loadStats();
                     loadClinics();
                 } else {
-                    const error = await response.json();
-                    alert(error.error || '儲存失敗');
+                    const errorData = await response.json().catch(() => ({ error: '儲存失敗' }));
+                    console.error('儲存失敗:', errorData);
+                    alert(errorData.error || '儲存失敗');
                 }
             } catch (error) {
                 console.error('儲存失敗:', error);
-                alert('儲存失敗，請稍後再試');
+                alert('儲存失敗，請稍後再試: ' + error.message);
             }
         }
 
