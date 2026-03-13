@@ -162,11 +162,11 @@
         }
 
         .chart-container.tall {
-            height: 500px;
+            height: 600px;
         }
 
         @media (max-width: 1200px) {
-            .stats-summary {
+        .stats-summary {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
@@ -189,6 +189,7 @@
         </div>
         <div class="nav">
             <a href="/" class="nav-btn">📋 診所管理</a>
+            <a href="/health-mall" class="nav-btn">🏪 健康醫購</a>
             <a href="/analytics" class="nav-btn active">📊 統計分析</a>
             <a href="/logout" class="nav-btn">🚪 登出</a>
         </div>
@@ -259,6 +260,184 @@
         // 色彩配置
         const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#30cfd0'];
 
+        // 載入台灣地圖 GeoJSON
+        async function loadTaiwanMapData() {
+            try {
+                const response = await fetch('https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/json/provinces/taiwan.json');
+                if (!response.ok) {
+                    // 如果官方 CDN 失敗，使用備用資料源
+                    const backup = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/710000_full.json');
+                    return await backup.json();
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('載入地圖資料失敗:', error);
+                // 返回簡化的台灣地圖
+                return getSimpleTaiwanMap();
+            }
+        }
+
+        // 備用：簡化的台灣本島地圖
+        function getSimpleTaiwanMap() {
+            return {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "基隆市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.74, 25.13], [121.70, 25.11], [121.72, 25.08], [121.76, 25.10], [121.74, 25.13]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "新北市"},
+                        "geometry": {
+                            "type": "MultiPolygon",
+                            "coordinates": [[[[121.95, 25.20], [121.74, 25.13], [121.61, 25.09], [121.47, 25.01], [121.38, 25.08], [121.35, 24.95], [121.22, 24.65], [121.08, 24.70], [121.18, 25.00], [121.30, 25.28], [121.52, 25.18], [121.95, 25.20]]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "台北市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.61, 25.09], [121.52, 25.05], [121.47, 25.01], [121.50, 24.97], [121.58, 24.99], [121.61, 25.09]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "桃園市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.38, 25.08], [121.35, 24.95], [121.22, 24.65], [121.03, 24.65], [120.82, 24.88], [121.00, 25.12], [121.38, 25.08]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "新竹市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.02, 24.84], [120.97, 24.81], [120.97, 24.77], [121.02, 24.79], [121.02, 24.84]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "新竹縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.35, 24.95], [121.22, 24.65], [121.03, 24.65], [121.03, 24.42], [120.82, 24.58], [120.78, 25.02], [121.35, 24.95]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "苗栗縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.22, 24.65], [121.15, 24.38], [120.82, 24.12], [120.62, 24.28], [120.62, 24.68], [121.03, 24.65], [121.22, 24.65]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "台中市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.15, 24.38], [121.03, 24.02], [120.68, 23.82], [120.48, 23.98], [120.48, 24.52], [120.62, 24.68], [120.82, 24.12], [121.15, 24.38]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "彰化縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[120.68, 24.15], [120.68, 23.98], [120.55, 23.78], [120.32, 23.88], [120.32, 24.18], [120.68, 24.15]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "南投縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.12, 24.08], [121.08, 23.68], [120.82, 23.38], [120.62, 23.55], [120.62, 24.22], [120.68, 23.98], [121.03, 24.02], [121.12, 24.08]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "雲林縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[120.62, 23.88], [120.62, 23.62], [120.45, 23.42], [120.22, 23.55], [120.22, 23.92], [120.32, 23.88], [120.62, 23.88]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "嘉義市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[120.48, 23.49], [120.45, 23.47], [120.46, 23.43], [120.49, 23.45], [120.48, 23.49]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "嘉義縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[120.62, 23.68], [120.62, 23.48], [120.42, 23.22], [120.18, 23.35], [120.18, 23.72], [120.22, 23.92], [120.45, 23.42], [120.62, 23.62], [120.62, 23.68]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "台南市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[120.42, 23.42], [120.42, 23.05], [120.18, 22.78], [119.98, 22.95], [119.98, 23.48], [120.18, 23.35], [120.42, 23.22], [120.42, 23.42]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "高雄市"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[120.68, 23.18], [120.62, 22.68], [120.28, 22.35], [119.98, 22.52], [120.18, 22.78], [120.42, 23.05], [120.68, 23.18]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "屏東縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[120.62, 22.78], [120.58, 22.28], [120.32, 21.92], [120.08, 22.05], [120.28, 22.35], [120.62, 22.68], [120.62, 22.78]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "宜蘭縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.95, 24.88], [121.92, 24.62], [121.72, 24.28], [121.52, 24.55], [121.52, 25.18], [121.95, 25.20], [121.95, 24.88]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "花蓮縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.72, 24.28], [121.68, 23.58], [121.48, 22.98], [121.32, 23.15], [121.32, 24.52], [121.52, 24.55], [121.72, 24.28]]]
+                        }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "台東縣"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[121.48, 23.15], [121.38, 22.62], [121.12, 22.18], [120.98, 22.35], [121.12, 23.38], [121.32, 23.15], [121.48, 23.15]]]
+                        }
+                    }
+                ]
+            };
+        }
+
         // 載入所有資料
         async function loadAllData() {
             try {
@@ -279,91 +458,122 @@
                 document.getElementById('totalRegions').textContent = regionsData.regions.length;
                 document.getElementById('totalSpecialties').textContent = specialtiesData.specialties.length;
                 
-                // 計算健康醫購數量（媒體項目包含「全部」）
+                // 計算健康醫購數量（只看 health_mall 欄位）
                 const clinicsRes = await fetch('/api/clinics');
                 const clinics = await clinicsRes.json();
-                const healthMallCount = clinics.filter(c => c.media_items && c.media_items.includes('全部')).length;
+                const healthMallCount = clinics.filter(c => c.health_mall === '是').length;
                 document.getElementById('healthMallCount').textContent = healthMallCount;
 
                 // 繪製圖表
-                drawTaiwanMap(mapData);
+                await drawTaiwanMap(mapData);
                 drawRegionChart(regionsData);
                 drawSpecialtyChart(specialtiesData);
                 drawHealthMallSpecialtyChart(clinics);
                 drawHealthMallRegionChart(clinics);
-
+                
             } catch (error) {
                 console.error('載入資料失敗:', error);
             }
         }
 
-        // 1. 繪製台灣地圖（優化版）
-        function drawTaiwanMap(data) {
+        // 1. 繪製台灣地圖（使用 ECharts 官方地圖）
+        async function drawTaiwanMap(data) {
             const chart = echarts.init(document.getElementById('taiwanMap'));
             
-            const taiwanGeoJson = {
-                "type": "FeatureCollection",
-                "features": [
-                    {"type":"Feature","properties":{"name":"台北市"},"geometry":{"type":"Polygon","coordinates":[[[121.565,25.09],[121.51,25.04],[121.46,25.01],[121.45,24.98],[121.505,24.96],[121.59,24.99],[121.62,25.08],[121.61,25.13],[121.565,25.09]]]}},
-                    {"type":"Feature","properties":{"name":"新北市"},"geometry":{"type":"Polygon","coordinates":[[[121.8,25.2],[121.3,25.3],[121.2,25.0],[121.1,24.7],[121.4,24.6],[121.9,24.8],[122.0,25.1],[121.8,25.2]]]}},
-                    {"type":"Feature","properties":{"name":"桃園市"},"geometry":{"type":"Polygon","coordinates":[[[121.45,25.1],[121.0,25.15],[120.85,24.85],[121.05,24.65],[121.35,24.7],[121.45,25.0],[121.45,25.1]]]}},
-                    {"type":"Feature","properties":{"name":"台中市"},"geometry":{"type":"Polygon","coordinates":[[[121.2,24.5],[120.5,24.6],[120.4,24.0],[120.6,23.8],[121.0,23.9],[121.2,24.3],[121.2,24.5]]]}},
-                    {"type":"Feature","properties":{"name":"台南市"},"geometry":{"type":"Polygon","coordinates":[[[120.5,23.3],[120.0,23.4],[119.9,22.9],[120.1,22.7],[120.4,22.8],[120.5,23.1],[120.5,23.3]]]}},
-                    {"type":"Feature","properties":{"name":"高雄市"},"geometry":{"type":"Polygon","coordinates":[[[120.7,23.0],[120.2,23.1],[120.0,22.5],[120.2,22.3],[120.5,22.4],[120.7,22.8],[120.7,23.0]]]}},
-                    {"type":"Feature","properties":{"name":"新竹市"},"geometry":{"type":"Polygon","coordinates":[[[121.0,24.85],[120.9,24.75],[120.95,24.7],[121.05,24.75],[121.0,24.85]]]}},
-                    {"type":"Feature","properties":{"name":"基隆市"},"geometry":{"type":"Polygon","coordinates":[[[121.75,25.15],[121.65,25.1],[121.7,25.05],[121.8,25.1],[121.75,25.15]]]}},
-                    {"type":"Feature","properties":{"name":"嘉義市"},"geometry":{"type":"Polygon","coordinates":[[[120.48,23.5],[120.42,23.45],[120.46,23.42],[120.52,23.46],[120.48,23.5]]]}}
-                ]
-            };
+            // 載入地圖資料
+            const geoJson = await loadTaiwanMapData();
             
-            echarts.registerMap('taiwan', taiwanGeoJson);
+            // 註冊地圖
+            echarts.registerMap('taiwan', geoJson);
             
             const option = {
                 tooltip: {
                     trigger: 'item',
-                    formatter: '{b}<br/>診所數量: {c} 間',
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    formatter: function(params) {
+                        return '<strong>' + params.name + '</strong><br/>診所數量: ' + (params.value || 0) + ' 間';
+                    },
+                    backgroundColor: 'rgba(255, 255, 255, 0.96)',
                     borderColor: '#667eea',
-                    borderWidth: 1,
+                    borderWidth: 2,
                     textStyle: {
                         color: '#333',
                         fontSize: 14
-                    }
+                    },
+                    padding: [10, 15],
+                    extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.15);'
                 },
                 visualMap: {
                     min: 0,
                     max: Math.max(...data.map(d => d.value), 10),
-                    text: ['多', '少'],
+                    text: ['診所多', '診所少'],
                     realtime: false,
                     calculable: true,
+                    orient: 'horizontal',
+                    left: 'center',
+                    bottom: '3%',
                     inRange: {
-                        color: ['#e0f3ff', '#90caf9', '#42a5f5', '#1e88e5', '#1565c0']
+                        color: [
+                            '#e3f2fd',  // 最淡藍
+                            '#bbdefb',
+                            '#90caf9',
+                            '#64b5f6',
+                            '#42a5f5',
+                            '#2196f3',
+                            '#1e88e5',
+                            '#1976d2',
+                            '#1565c0',
+                            '#0d47a1'   // 最深藍
+                        ]
                     },
                     textStyle: {
-                        color: '#333'
+                        color: '#333',
+                        fontSize: 12
                     }
                 },
                 series: [{
                     name: '診所數量',
                     type: 'map',
                     map: 'taiwan',
-                    roam: true,
+                    roam: false,
+                    aspectScale: 1.0,
+                    layoutCenter: ['50%', '52%'],
+                    layoutSize: '85%',
                     label: {
                         show: true,
-                        fontSize: 11,
+                        fontSize: 10,
                         color: '#333',
-                        fontWeight: 'bold'
+                        fontWeight: '600'
                     },
                     emphasis: {
                         label: {
                             show: true,
                             fontSize: 13,
-                            color: '#fff'
+                            color: '#fff',
+                            fontWeight: 'bold'
                         },
                         itemStyle: {
                             areaColor: '#667eea',
-                            shadowBlur: 10,
-                            shadowColor: 'rgba(0, 0, 0, 0.3)'
+                            shadowBlur: 20,
+                            shadowColor: 'rgba(102, 126, 234, 0.7)',
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }
+                    },
+                    itemStyle: {
+                        areaColor: '#f5f5f5',
+                        borderColor: '#ffffff',
+                        borderWidth: 1.5,
+                        shadowBlur: 5,
+                        shadowColor: 'rgba(0, 0, 0, 0.1)',
+                        shadowOffsetX: 0,
+                        shadowOffsetY: 2
+                    },
+                    select: {
+                        itemStyle: {
+                            areaColor: '#667eea'
+                        },
+                        label: {
+                            color: '#fff'
                         }
                     },
                     data: data
@@ -371,7 +581,11 @@
             };
             
             chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
+            
+            // 響應式
+            window.addEventListener('resize', () => {
+                chart.resize();
+            });
         }
 
         // 2. 繪製縣市排行（優化版）
@@ -506,18 +720,35 @@
             window.addEventListener('resize', () => chart.resize());
         }
 
-        // 4. 繪製健康醫購科別分布（新增）
+        // 4. 繪製健康醫購科別分布
         function drawHealthMallSpecialtyChart(clinics) {
             const chart = echarts.init(document.getElementById('healthMallSpecialtyChart'));
             
-            // 篩選出健康醫購診所（媒體項目包含「全部」）
-            const healthMallClinics = clinics.filter(c => c.media_items && c.media_items.includes('全部'));
+            console.log('健康醫購科別分析 - 所有診所:', clinics.length);
+            
+            // 篩選健康醫購診所（只看 health_mall 欄位）
+            const healthMallClinics = clinics.filter(c => c.health_mall === '是');
+            
+            console.log('健康醫購診所數量:', healthMallClinics.length);
+            
+            // 如果沒有健康醫購診所
+            if (healthMallClinics.length === 0) {
+                chart.setOption({
+                    title: {
+                        text: '目前沒有健康醫購診所',
+                        left: 'center',
+                        top: 'center',
+                        textStyle: { color: '#999', fontSize: 16 }
+                    }
+                });
+                return;
+            }
             
             // 統計各科別數量
             const specialtyCount = {};
             healthMallClinics.forEach(clinic => {
-                if (clinic.specialties) {
-                    const specs = clinic.specialties.split(',').map(s => s.trim());
+                if (clinic.specialties && clinic.specialties.trim().length > 0) {
+                    const specs = clinic.specialties.split(',').map(s => s.trim()).filter(s => s.length > 0);
                     specs.forEach(spec => {
                         specialtyCount[spec] = (specialtyCount[spec] || 0) + 1;
                     });
@@ -527,6 +758,20 @@
             const chartData = Object.entries(specialtyCount)
                 .map(([name, value]) => ({ name, value }))
                 .sort((a, b) => b.value - a.value);
+            
+            console.log('科別統計:', chartData);
+            
+            if (chartData.length === 0) {
+                chart.setOption({
+                    title: {
+                        text: '健康醫購診所沒有科別資料',
+                        left: 'center',
+                        top: 'center',
+                        textStyle: { color: '#999', fontSize: 16 }
+                    }
+                });
+                return;
+            }
             
             const option = {
                 tooltip: {
@@ -543,13 +788,13 @@
                 xAxis: {
                     type: 'category',
                     data: chartData.map(d => d.name),
-                    axisLabel: {
-                        rotate: 45,
-                        fontSize: 12
-                    }
+                    axisLabel: { rotate: 45, fontSize: 12 },
+                    axisLine: { lineStyle: { color: '#ddd' } }
                 },
                 yAxis: {
-                    type: 'value'
+                    type: 'value',
+                    axisLine: { lineStyle: { color: '#ddd' } },
+                    splitLine: { lineStyle: { color: '#f0f0f0' } }
                 },
                 series: [{
                     name: '數量',
@@ -575,43 +820,49 @@
             window.addEventListener('resize', () => chart.resize());
         }
 
-        // 5. 繪製健康醫購地區分布（新增）
+        // 5. 繪製健康醫購地區分布（只顯示健康醫購）
         function drawHealthMallRegionChart(clinics) {
             const chart = echarts.init(document.getElementById('healthMallRegionChart'));
             
-            // 統計各地區的健康醫購和非健康醫購數量
-            const regionData = {};
-            clinics.forEach(clinic => {
+            console.log('健康醫購地區分析 - 所有診所:', clinics.length);
+            
+            // 篩選健康醫購診所（只看 health_mall 欄位）
+            const healthMallClinics = clinics.filter(c => c.health_mall === '是');
+            
+            console.log('健康醫購診所數量:', healthMallClinics.length);
+            
+            // 如果沒有健康醫購診所
+            if (healthMallClinics.length === 0) {
+                chart.setOption({
+                    title: {
+                        text: '目前沒有健康醫購診所',
+                        left: 'center',
+                        top: 'center',
+                        textStyle: { color: '#999', fontSize: 16 }
+                    }
+                });
+                return;
+            }
+            
+            // 統計各地區的健康醫購數量
+            const regionCount = {};
+            healthMallClinics.forEach(clinic => {
                 if (clinic.region) {
-                    if (!regionData[clinic.region]) {
-                        regionData[clinic.region] = { yes: 0, no: 0 };
-                    }
-                    if (clinic.media_items && clinic.media_items.includes('全部')) {
-                        regionData[clinic.region].yes++;
-                    } else {
-                        regionData[clinic.region].no++;
-                    }
+                    regionCount[clinic.region] = (regionCount[clinic.region] || 0) + 1;
                 }
             });
             
-            const regions = Object.keys(regionData).sort();
-            const yesData = regions.map(r => regionData[r].yes);
-            const noData = regions.map(r => regionData[r].no);
+            const chartData = Object.entries(regionCount)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value);
+            
+            console.log('地區統計:', chartData);
             
             const option = {
                 tooltip: {
                     trigger: 'axis',
                     axisPointer: { type: 'shadow' },
-                    formatter: function(params) {
-                        let result = params[0].axisValue + '<br/>';
-                        params.forEach(item => {
-                            result += item.marker + item.seriesName + ': ' + item.value + ' 間<br/>';
-                        });
-                        return result;
-                    }
-                },
-                legend: {
-                    data: ['健康醫購', '非健康醫購']
+                    formatter: '{b}<br/>健康醫購: {c} 間'
                 },
                 grid: {
                     left: '3%',
@@ -621,41 +872,42 @@
                 },
                 xAxis: {
                     type: 'category',
-                    data: regions,
-                    axisLabel: {
-                        rotate: 45,
-                        fontSize: 12
-                    }
+                    data: chartData.map(d => d.name),
+                    axisLabel: { rotate: 45, fontSize: 12 },
+                    axisLine: { lineStyle: { color: '#ddd' } }
                 },
                 yAxis: {
-                    type: 'value'
+                    type: 'value',
+                    axisLine: { lineStyle: { color: '#ddd' } },
+                    splitLine: { lineStyle: { color: '#f0f0f0' } }
                 },
-                series: [
-                    {
-                        name: '健康醫購',
-                        type: 'bar',
-                        stack: 'total',
-                        data: yesData,
-                        itemStyle: { color: '#4ade80' },
-                        label: {
-                            show: true,
-                            position: 'inside',
-                            formatter: '{c}'
-                        }
+                series: [{
+                    name: '健康醫購',
+                    type: 'bar',
+                    data: chartData.map(d => d.value),
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#4ade80' },
+                            { offset: 1, color: '#22c55e' }
+                        ]),
+                        borderRadius: [8, 8, 0, 0]
                     },
-                    {
-                        name: '非健康醫購',
-                        type: 'bar',
-                        stack: 'total',
-                        data: noData,
-                        itemStyle: { color: '#f87171' },
-                        label: {
-                            show: true,
-                            position: 'inside',
-                            formatter: '{c}'
+                    label: {
+                        show: true,
+                        position: 'top',
+                        fontSize: 12,
+                        fontWeight: 'bold',
+                        color: '#22c55e'
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: '#22c55e' },
+                                { offset: 1, color: '#16a34a' }
+                            ])
                         }
                     }
-                ]
+                }]
             };
             
             chart.setOption(option);
