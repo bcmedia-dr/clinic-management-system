@@ -334,6 +334,52 @@ def export_health_mall():
 
 # ── 分析 API ─────────────────────────────────────────────────
 
+@app.route('/api/analytics/stats')
+def get_analytics_stats():
+    """整合統計 API：診所 + 健康醫購"""
+    clinics = Clinic.query.all()
+
+    # 診所總數與縣市分布
+    total = len(clinics)
+    region_count = Counter(c.region for c in clinics if c.region)
+    top_region = region_count.most_common(1)[0] if region_count else ('N/A', 0)
+
+    # 科別分布
+    specialty_list = []
+    for c in clinics:
+        if c.specialties:
+            specialty_list.extend(s.strip() for s in c.specialties.split(',') if s.strip())
+    specialty_count = Counter(specialty_list)
+
+    # 合作項目分布
+    col_items = {
+        '藥袋':    sum(1 for c in clinics if c.col_yaodai),
+        '海報/立牌': sum(1 for c in clinics if c.col_haibao),
+        '派樣':    sum(1 for c in clinics if c.col_paiyang),
+        '百位':    sum(1 for c in clinics if c.col_baiwei),
+    }
+
+    # 健康醫購
+    hm = [c for c in clinics if c.health_mall_status in ('合作中', '暫停', '結束')]
+    hm_total  = len(hm)
+    hm_active = sum(1 for c in hm if c.health_mall_status == '合作中')
+    hm_paused = sum(1 for c in hm if c.health_mall_status == '暫停')
+    hm_ended  = sum(1 for c in hm if c.health_mall_status == '結束')
+    hm_region_count = Counter(c.region for c in hm if c.region)
+
+    return jsonify({
+        'total':            total,
+        'hm_total':         hm_total,
+        'hm_active':        hm_active,
+        'top_region':       top_region[0],
+        'top_region_count': top_region[1],
+        'regions':      dict(region_count),
+        'specialties':  dict(specialty_count),
+        'col_items':    col_items,
+        'hm_status':    {'合作中': hm_active, '暫停': hm_paused, '結束': hm_ended},
+        'hm_regions':   dict(hm_region_count),
+    })
+
 @app.route('/api/analytics/regions')
 def get_region_stats():
     clinics = Clinic.query.all()

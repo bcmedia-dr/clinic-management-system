@@ -5,917 +5,382 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>統計分析 - Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
 
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background: #f5f7fa;
-            color: #333;
-        }
-
+        /* ── Header ── */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 20px 40px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .logo {
-            font-size: 32px;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-        }
-
-        .nav {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo { font-size: 32px; }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .nav { display: flex; gap: 10px; margin-top: 15px; }
         .nav-btn {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            text-decoration: none;
-            transition: all 0.3s;
+            background: rgba(255,255,255,0.2); color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px; border-radius: 8px;
+            text-decoration: none; font-size: 14px;
+            transition: all 0.3s; display: inline-block;
         }
-
-        .nav-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
+        .nav-btn:hover { background: rgba(255,255,255,0.3); }
+        .nav-btn.active { background: white; color: #667eea; border-color: white; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        .btn-logout {
+            background: rgba(255,255,255,0.2); color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px;
         }
+        .btn-logout:hover { background: rgba(255,255,255,0.3); }
 
-        .nav-btn.active {
-            background: white;
-            color: #667eea;
-        }
+        /* ── Layout ── */
+        .container { max-width: 1400px; margin: 0 auto; padding: 30px; }
 
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-            padding: 30px;
-        }
-
-        .page-title {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 30px;
-            color: #333;
-        }
-
-        /* 統計卡片 */
-        .stats-summary {
+        /* ── Stat cards ── */
+        .stats-row {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
-
-        .stat-box {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            text-align: center;
-            transition: all 0.3s;
+        .stat-card {
+            background: white; padding: 24px 20px;
+            border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+        .stat-card.c1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .stat-card.c2 { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
+        .stat-card.c3 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .stat-card.c4 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+        .stat-icon { font-size: 36px; margin-bottom: 8px; }
+        .stat-label { font-size: 13px; opacity: 0.9; margin-bottom: 4px; }
+        .stat-value { font-size: 34px; font-weight: 700; }
+        .stat-sub { font-size: 12px; opacity: 0.8; margin-top: 4px; }
 
-        .stat-box:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .stat-box .icon {
-            font-size: 42px;
-            margin-bottom: 12px;
-        }
-
-        .stat-box .label {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 8px;
-        }
-
-        .stat-box .value {
-            font-size: 36px;
-            font-weight: 700;
-            color: #667eea;
-        }
-
-        /* 圖表網格 */
+        /* ── Chart grid ── */
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 25px;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
         }
+        .chart-full { grid-column: 1 / -1; }
 
         .chart-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s;
+            background: white; border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 24px;
         }
-
-        .chart-card:hover {
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .chart-card.full-width {
-            grid-column: 1 / -1;
-        }
-
         .chart-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            color: #333;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            font-size: 16px; font-weight: 700; color: #333;
+            margin-bottom: 20px; padding-bottom: 12px;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .chart-title .dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            display: inline-block;
+        }
+        .chart-wrap { position: relative; height: 280px; }
+        .chart-wrap.tall { height: 340px; }
+
+        .loading {
+            display: flex; align-items: center; justify-content: center;
+            height: 280px; color: #999; font-size: 14px;
         }
 
-        .chart-container {
-            width: 100%;
-            height: 400px;
-        }
-
-        .chart-container.tall {
-            height: 600px;
-        }
-
-        @media (max-width: 1200px) {
-        .stats-summary {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 768px) {
-            .stats-summary {
-                grid-template-columns: 1fr;
-            }
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 900px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+            .chart-full { grid-column: auto; }
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="header-left">
-            <div class="logo">🏥</div>
-            <h1>Bcmedia 診所管理系統</h1>
+        <div class="header-top">
+            <div class="header-left">
+                <div class="logo">📊</div>
+                <h1>統計分析</h1>
+            </div>
+            <div class="header-right">
+                <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+            </div>
         </div>
         <div class="nav">
             <a href="/" class="nav-btn">📋 診所管理</a>
             <a href="/health-mall" class="nav-btn">🏪 健康醫購</a>
             <a href="/analytics" class="nav-btn active">📊 統計分析</a>
-            <a href="/logout" class="nav-btn">🚪 登出</a>
         </div>
     </div>
 
     <div class="container">
-        <h2 class="page-title">📊 統計分析儀表板</h2>
-
-        <!-- 統計摘要卡片 -->
-        <div class="stats-summary">
-            <div class="stat-box">
-                <div class="icon">🏥</div>
-                <div class="label">總診所數</div>
-                <div class="value" id="totalClinics">0</div>
+        <!-- 數字卡片 -->
+        <div class="stats-row">
+            <div class="stat-card c1">
+                <div class="stat-icon">🏥</div>
+                <div class="stat-label">診所總數</div>
+                <div class="stat-value" id="kTotal">—</div>
             </div>
-            <div class="stat-box">
-                <div class="icon">📍</div>
-                <div class="label">涵蓋縣市</div>
-                <div class="value" id="totalRegions">0</div>
+            <div class="stat-card c2">
+                <div class="stat-icon">🏪</div>
+                <div class="stat-label">健康醫購診所</div>
+                <div class="stat-value" id="kHmTotal">—</div>
             </div>
-            <div class="stat-box">
-                <div class="icon">🏷️</div>
-                <div class="label">科別種類</div>
-                <div class="value" id="totalSpecialties">0</div>
+            <div class="stat-card c3">
+                <div class="stat-icon">✅</div>
+                <div class="stat-label">健康醫購合作中</div>
+                <div class="stat-value" id="kHmActive">—</div>
             </div>
-            <div class="stat-box">
-                <div class="icon">✅</div>
-                <div class="label">健康醫購</div>
-                <div class="value" id="healthMallCount">0</div>
+            <div class="stat-card c4">
+                <div class="stat-icon">📍</div>
+                <div class="stat-label">最多診所縣市</div>
+                <div class="stat-value" id="kTopRegion" style="font-size:22px;">—</div>
+                <div class="stat-sub" id="kTopRegionCount"></div>
             </div>
         </div>
 
-        <!-- 圖表區域 -->
+        <!-- 圖表區 -->
         <div class="charts-grid">
-            <!-- 1. 台灣地圖 -->
-            <div class="chart-card full-width">
-                <h3 class="chart-title">🗺️ 台灣各縣市診所分布地圖</h3>
-                <div id="taiwanMap" class="chart-container tall"></div>
+            <!-- 1. 各縣市診所數 -->
+            <div class="chart-card">
+                <div class="chart-title">
+                    <span class="dot" style="background:#667eea;"></span>
+                    各縣市診所數量
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="chartRegion"></canvas>
+                </div>
             </div>
 
-            <!-- 2. 各縣市排行 -->
+            <!-- 2. 各科別比例 -->
             <div class="chart-card">
-                <h3 class="chart-title">📊 各縣市診所數量排行</h3>
-                <div id="regionChart" class="chart-container"></div>
+                <div class="chart-title">
+                    <span class="dot" style="background:#f093fb;"></span>
+                    各科別比例
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="chartSpecialty"></canvas>
+                </div>
             </div>
 
-            <!-- 3. 科別分布 -->
+            <!-- 3. 合作項目分布 -->
             <div class="chart-card">
-                <h3 class="chart-title">🏷️ 診所科別分布</h3>
-                <div id="specialtyChart" class="chart-container"></div>
+                <div class="chart-title">
+                    <span class="dot" style="background:#43e97b;"></span>
+                    合作項目分布
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="chartColItems"></canvas>
+                </div>
             </div>
 
-            <!-- 4. 健康醫購科別分布 -->
+            <!-- 4. 健康醫購合作狀態 -->
             <div class="chart-card">
-                <h3 class="chart-title">✅ 健康醫購科別分布</h3>
-                <div id="healthMallSpecialtyChart" class="chart-container"></div>
+                <div class="chart-title">
+                    <span class="dot" style="background:#11998e;"></span>
+                    健康醫購合作狀態
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="chartHmStatus"></canvas>
+                </div>
             </div>
 
-            <!-- 5. 健康醫購地區分布 -->
-            <div class="chart-card">
-                <h3 class="chart-title">📈 健康醫購地區分布</h3>
-                <div id="healthMallRegionChart" class="chart-container"></div>
+            <!-- 5. 各縣市健康醫購數（全寬） -->
+            <div class="chart-card chart-full">
+                <div class="chart-title">
+                    <span class="dot" style="background:#4facfe;"></span>
+                    各縣市健康醫購診所數量
+                </div>
+                <div class="chart-wrap tall">
+                    <canvas id="chartHmRegion"></canvas>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // 色彩配置
-        const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#30cfd0'];
+        // Chart.js 全域預設
+        Chart.defaults.font.family = "'Noto Sans TC', sans-serif";
+        Chart.defaults.font.size = 13;
+        Chart.defaults.color = '#555';
 
-        // 載入台灣地圖 GeoJSON
-        async function loadTaiwanMapData() {
+        const COLORS = [
+            '#667eea','#764ba2','#f093fb','#f5576c','#4facfe',
+            '#00f2fe','#43e97b','#38f9d7','#fa709a','#fee140',
+            '#30cfd0','#a18cd1','#fda085','#ffecd2','#96fbc4',
+        ];
+
+        async function loadAndRender() {
             try {
-                const response = await fetch('https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/json/provinces/taiwan.json');
-                if (!response.ok) {
-                    // 如果官方 CDN 失敗，使用備用資料源
-                    const backup = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/710000_full.json');
-                    return await backup.json();
-                }
-                return await response.json();
-            } catch (error) {
-                console.error('載入地圖資料失敗:', error);
-                // 返回簡化的台灣地圖
-                return getSimpleTaiwanMap();
-            }
-        }
+                const res = await fetch('/api/analytics/stats');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const d = await res.json();
 
-        // 備用：簡化的台灣本島地圖
-        function getSimpleTaiwanMap() {
-            return {
-                "type": "FeatureCollection",
-                "features": [
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "基隆市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.74, 25.13], [121.70, 25.11], [121.72, 25.08], [121.76, 25.10], [121.74, 25.13]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "新北市"},
-                        "geometry": {
-                            "type": "MultiPolygon",
-                            "coordinates": [[[[121.95, 25.20], [121.74, 25.13], [121.61, 25.09], [121.47, 25.01], [121.38, 25.08], [121.35, 24.95], [121.22, 24.65], [121.08, 24.70], [121.18, 25.00], [121.30, 25.28], [121.52, 25.18], [121.95, 25.20]]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "台北市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.61, 25.09], [121.52, 25.05], [121.47, 25.01], [121.50, 24.97], [121.58, 24.99], [121.61, 25.09]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "桃園市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.38, 25.08], [121.35, 24.95], [121.22, 24.65], [121.03, 24.65], [120.82, 24.88], [121.00, 25.12], [121.38, 25.08]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "新竹市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.02, 24.84], [120.97, 24.81], [120.97, 24.77], [121.02, 24.79], [121.02, 24.84]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "新竹縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.35, 24.95], [121.22, 24.65], [121.03, 24.65], [121.03, 24.42], [120.82, 24.58], [120.78, 25.02], [121.35, 24.95]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "苗栗縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.22, 24.65], [121.15, 24.38], [120.82, 24.12], [120.62, 24.28], [120.62, 24.68], [121.03, 24.65], [121.22, 24.65]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "台中市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.15, 24.38], [121.03, 24.02], [120.68, 23.82], [120.48, 23.98], [120.48, 24.52], [120.62, 24.68], [120.82, 24.12], [121.15, 24.38]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "彰化縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[120.68, 24.15], [120.68, 23.98], [120.55, 23.78], [120.32, 23.88], [120.32, 24.18], [120.68, 24.15]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "南投縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.12, 24.08], [121.08, 23.68], [120.82, 23.38], [120.62, 23.55], [120.62, 24.22], [120.68, 23.98], [121.03, 24.02], [121.12, 24.08]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "雲林縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[120.62, 23.88], [120.62, 23.62], [120.45, 23.42], [120.22, 23.55], [120.22, 23.92], [120.32, 23.88], [120.62, 23.88]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "嘉義市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[120.48, 23.49], [120.45, 23.47], [120.46, 23.43], [120.49, 23.45], [120.48, 23.49]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "嘉義縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[120.62, 23.68], [120.62, 23.48], [120.42, 23.22], [120.18, 23.35], [120.18, 23.72], [120.22, 23.92], [120.45, 23.42], [120.62, 23.62], [120.62, 23.68]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "台南市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[120.42, 23.42], [120.42, 23.05], [120.18, 22.78], [119.98, 22.95], [119.98, 23.48], [120.18, 23.35], [120.42, 23.22], [120.42, 23.42]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "高雄市"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[120.68, 23.18], [120.62, 22.68], [120.28, 22.35], [119.98, 22.52], [120.18, 22.78], [120.42, 23.05], [120.68, 23.18]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "屏東縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[120.62, 22.78], [120.58, 22.28], [120.32, 21.92], [120.08, 22.05], [120.28, 22.35], [120.62, 22.68], [120.62, 22.78]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "宜蘭縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.95, 24.88], [121.92, 24.62], [121.72, 24.28], [121.52, 24.55], [121.52, 25.18], [121.95, 25.20], [121.95, 24.88]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "花蓮縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.72, 24.28], [121.68, 23.58], [121.48, 22.98], [121.32, 23.15], [121.32, 24.52], [121.52, 24.55], [121.72, 24.28]]]
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "台東縣"},
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [[[121.48, 23.15], [121.38, 22.62], [121.12, 22.18], [120.98, 22.35], [121.12, 23.38], [121.32, 23.15], [121.48, 23.15]]]
-                        }
-                    }
-                ]
-            };
-        }
+                // ── 數字卡片 ──
+                document.getElementById('kTotal').textContent      = d.total;
+                document.getElementById('kHmTotal').textContent    = d.hm_total;
+                document.getElementById('kHmActive').textContent   = d.hm_active;
+                document.getElementById('kTopRegion').textContent  = d.top_region;
+                document.getElementById('kTopRegionCount').textContent = d.top_region_count + ' 間';
 
-        // 載入所有資料
-        async function loadAllData() {
-            try {
-                const [statsRes, regionsRes, specialtiesRes, mapRes] = await Promise.all([
-                    fetch('/api/stats'),
-                    fetch('/api/analytics/regions'),
-                    fetch('/api/analytics/specialties'),
-                    fetch('/api/analytics/taiwan_map')
-                ]);
-
-                const stats = await statsRes.json();
-                const regionsData = await regionsRes.json();
-                const specialtiesData = await specialtiesRes.json();
-                const mapData = await mapRes.json();
-
-                // 更新統計卡片
-                document.getElementById('totalClinics').textContent = stats.total || 0;
-                document.getElementById('totalRegions').textContent = regionsData.regions.length;
-                document.getElementById('totalSpecialties').textContent = specialtiesData.specialties.length;
-                
-                // 計算健康醫購數量（只看 health_mall 欄位）
-                const clinicsRes = await fetch('/api/clinics');
-                const clinics = await clinicsRes.json();
-                const healthMallCount = clinics.filter(c => c.health_mall === '是').length;
-                document.getElementById('healthMallCount').textContent = healthMallCount;
-
-                // 繪製圖表
-                await drawTaiwanMap(mapData);
-                drawRegionChart(regionsData);
-                drawSpecialtyChart(specialtiesData);
-                drawHealthMallSpecialtyChart(clinics);
-                drawHealthMallRegionChart(clinics);
-                
-            } catch (error) {
-                console.error('載入資料失敗:', error);
-            }
-        }
-
-        // 1. 繪製台灣地圖（使用 ECharts 官方地圖）
-        async function drawTaiwanMap(data) {
-            const chart = echarts.init(document.getElementById('taiwanMap'));
-            
-            // 載入地圖資料
-            const geoJson = await loadTaiwanMapData();
-            
-            // 註冊地圖
-            echarts.registerMap('taiwan', geoJson);
-            
-            const option = {
-                tooltip: {
-                    trigger: 'item',
-                    formatter: function(params) {
-                        return '<strong>' + params.name + '</strong><br/>診所數量: ' + (params.value || 0) + ' 間';
-                    },
-                    backgroundColor: 'rgba(255, 255, 255, 0.96)',
-                    borderColor: '#667eea',
-                    borderWidth: 2,
-                    textStyle: {
-                        color: '#333',
-                        fontSize: 14
-                    },
-                    padding: [10, 15],
-                    extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.15);'
-                },
-                visualMap: {
-                    min: 0,
-                    max: Math.max(...data.map(d => d.value), 10),
-                    text: ['診所多', '診所少'],
-                    realtime: false,
-                    calculable: true,
-                    orient: 'horizontal',
-                    left: 'center',
-                    bottom: '3%',
-                    inRange: {
-                        color: [
-                            '#e3f2fd',  // 最淡藍
-                            '#bbdefb',
-                            '#90caf9',
-                            '#64b5f6',
-                            '#42a5f5',
-                            '#2196f3',
-                            '#1e88e5',
-                            '#1976d2',
-                            '#1565c0',
-                            '#0d47a1'   // 最深藍
-                        ]
-                    },
-                    textStyle: {
-                        color: '#333',
-                        fontSize: 12
-                    }
-                },
-                series: [{
-                    name: '診所數量',
-                    type: 'map',
-                    map: 'taiwan',
-                    roam: false,
-                    aspectScale: 1.0,
-                    layoutCenter: ['50%', '52%'],
-                    layoutSize: '85%',
-                    label: {
-                        show: true,
-                        fontSize: 10,
-                        color: '#333',
-                        fontWeight: '600'
-                    },
-                    emphasis: {
-                        label: {
-                            show: true,
-                            fontSize: 13,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                        },
-                        itemStyle: {
-                            areaColor: '#667eea',
-                            shadowBlur: 20,
-                            shadowColor: 'rgba(102, 126, 234, 0.7)',
-                            borderWidth: 2,
-                            borderColor: '#fff'
-                        }
-                    },
-                    itemStyle: {
-                        areaColor: '#f5f5f5',
-                        borderColor: '#ffffff',
-                        borderWidth: 1.5,
-                        shadowBlur: 5,
-                        shadowColor: 'rgba(0, 0, 0, 0.1)',
-                        shadowOffsetX: 0,
-                        shadowOffsetY: 2
-                    },
-                    select: {
-                        itemStyle: {
-                            areaColor: '#667eea'
-                        },
-                        label: {
-                            color: '#fff'
-                        }
-                    },
-                    data: data
-                }]
-            };
-            
-            chart.setOption(option);
-            
-            // 響應式
-            window.addEventListener('resize', () => {
-                chart.resize();
-            });
-        }
-
-        // 2. 繪製縣市排行（優化版）
-        function drawRegionChart(data) {
-            const chart = echarts.init(document.getElementById('regionChart'));
-            
-            const sortedData = data.regions.map((region, index) => ({
-                region: region,
-                count: data.counts[index]
-            })).sort((a, b) => b.count - a.count);
-            
-            const option = {
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    formatter: '{b}<br/>診所數量: {c} 間'
-                },
-                grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '3%',
-                    containLabel: true
-                },
-                xAxis: {
-                    type: 'category',
-                    data: sortedData.map(d => d.region),
-                    axisLabel: {
-                        rotate: 45,
-                        fontSize: 12
-                    },
-                    axisLine: {
-                        lineStyle: { color: '#ddd' }
-                    }
-                },
-                yAxis: {
-                    type: 'value',
-                    axisLine: {
-                        lineStyle: { color: '#ddd' }
-                    },
-                    splitLine: {
-                        lineStyle: { color: '#f0f0f0' }
-                    }
-                },
-                series: [{
-                    name: '診所數量',
+                // ── 1. 各縣市診所數（長條圖） ──
+                const regionLabels = Object.keys(d.regions);
+                const regionData   = Object.values(d.regions);
+                new Chart(document.getElementById('chartRegion'), {
                     type: 'bar',
-                    data: sortedData.map(d => d.count),
-                    itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: '#667eea' },
-                            { offset: 1, color: '#764ba2' }
-                        ]),
-                        borderRadius: [8, 8, 0, 0]
+                    data: {
+                        labels: regionLabels,
+                        datasets: [{
+                            label: '診所數',
+                            data: regionData,
+                            backgroundColor: regionLabels.map((_, i) => COLORS[i % COLORS.length] + 'cc'),
+                            borderColor:     regionLabels.map((_, i) => COLORS[i % COLORS.length]),
+                            borderWidth: 1,
+                            borderRadius: 6,
+                        }]
                     },
-                    label: {
-                        show: true,
-                        position: 'top',
-                        fontSize: 12,
-                        fontWeight: 'bold'
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: '#5568d3' },
-                                { offset: 1, color: '#6a3d8f' }
-                            ])
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                            x: { grid: { display: false } }
                         }
-                    }
-                }]
-            };
-            
-            chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
-        }
-
-        // 3. 繪製科別分布（優化版）
-        function drawSpecialtyChart(data) {
-            const chart = echarts.init(document.getElementById('specialtyChart'));
-            
-            const chartData = data.specialties.map((specialty, index) => ({
-                name: specialty,
-                value: data.counts[index]
-            })).sort((a, b) => b.value - a.value);
-            
-            const option = {
-                tooltip: {
-                    trigger: 'item',
-                    formatter: '{b}<br/>數量: {c} ({d}%)'
-                },
-                legend: {
-                    orient: 'vertical',
-                    left: 'left',
-                    textStyle: { fontSize: 12 }
-                },
-                series: [{
-                    name: '科別',
-                    type: 'pie',
-                    radius: ['45%', '70%'],
-                    avoidLabelOverlap: false,
-                    itemStyle: {
-                        borderRadius: 10,
-                        borderColor: '#fff',
-                        borderWidth: 2
-                    },
-                    label: {
-                        show: true,
-                        formatter: '{b}\n{d}%',
-                        fontSize: 11
-                    },
-                    emphasis: {
-                        label: {
-                            show: true,
-                            fontSize: 14,
-                            fontWeight: 'bold'
-                        },
-                        itemStyle: {
-                            shadowBlur: 10,
-                            shadowOffsetX: 0,
-                            shadowColor: 'rgba(0, 0, 0, 0.3)'
-                        }
-                    },
-                    data: chartData.map((item, index) => ({
-                        ...item,
-                        itemStyle: {
-                            color: colors[index % colors.length]
-                        }
-                    }))
-                }]
-            };
-            
-            chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
-        }
-
-        // 4. 繪製健康醫購科別分布
-        function drawHealthMallSpecialtyChart(clinics) {
-            const chart = echarts.init(document.getElementById('healthMallSpecialtyChart'));
-            
-            console.log('健康醫購科別分析 - 所有診所:', clinics.length);
-            
-            // 篩選健康醫購診所（只看 health_mall 欄位）
-            const healthMallClinics = clinics.filter(c => c.health_mall === '是');
-            
-            console.log('健康醫購診所數量:', healthMallClinics.length);
-            
-            // 如果沒有健康醫購診所
-            if (healthMallClinics.length === 0) {
-                chart.setOption({
-                    title: {
-                        text: '目前沒有健康醫購診所',
-                        left: 'center',
-                        top: 'center',
-                        textStyle: { color: '#999', fontSize: 16 }
                     }
                 });
-                return;
-            }
-            
-            // 統計各科別數量
-            const specialtyCount = {};
-            healthMallClinics.forEach(clinic => {
-                if (clinic.specialties && clinic.specialties.trim().length > 0) {
-                    const specs = clinic.specialties.split(',').map(s => s.trim()).filter(s => s.length > 0);
-                    specs.forEach(spec => {
-                        specialtyCount[spec] = (specialtyCount[spec] || 0) + 1;
+
+                // ── 2. 各科別比例（圓餅圖） ──
+                const specLabels = Object.keys(d.specialties);
+                const specData   = Object.values(d.specialties);
+                new Chart(document.getElementById('chartSpecialty'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: specLabels,
+                        datasets: [{
+                            data: specData,
+                            backgroundColor: specLabels.map((_, i) => COLORS[i % COLORS.length] + 'dd'),
+                            borderColor: '#fff',
+                            borderWidth: 2,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { boxWidth: 14, padding: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` ${ctx.label}：${ctx.parsed} 間`
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // ── 3. 合作項目分布（水平長條圖） ──
+                const colLabels = Object.keys(d.col_items);
+                const colData   = Object.values(d.col_items);
+                const colColors = ['#fff3cd', '#d4edda', '#cce5ff', '#f8d7da'];
+                const colBorders = ['#856404', '#155724', '#004085', '#721c24'];
+                new Chart(document.getElementById('chartColItems'), {
+                    type: 'bar',
+                    data: {
+                        labels: colLabels,
+                        datasets: [{
+                            label: '診所數',
+                            data: colData,
+                            backgroundColor: colColors,
+                            borderColor: colBorders,
+                            borderWidth: 2,
+                            borderRadius: 6,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                            y: { grid: { display: false } }
+                        }
+                    }
+                });
+
+                // ── 4. 健康醫購合作狀態（圓餅圖） ──
+                const hmStatusLabels = Object.keys(d.hm_status);
+                const hmStatusData   = Object.values(d.hm_status);
+                const hmStatusColors = ['#d4edda', '#fff3cd', '#f8d7da'];
+                const hmStatusBorders = ['#155724', '#856404', '#721c24'];
+                new Chart(document.getElementById('chartHmStatus'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: hmStatusLabels,
+                        datasets: [{
+                            data: hmStatusData,
+                            backgroundColor: hmStatusColors,
+                            borderColor: hmStatusBorders,
+                            borderWidth: 2,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { boxWidth: 14, padding: 16 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` ${ctx.label}：${ctx.parsed} 間`
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // ── 5. 各縣市健康醫購數（長條圖，全寬） ──
+                const hmRegionLabels = Object.keys(d.hm_regions);
+                const hmRegionData   = Object.values(d.hm_regions);
+
+                if (hmRegionLabels.length === 0) {
+                    document.getElementById('chartHmRegion').parentElement.innerHTML =
+                        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:14px;">尚無健康醫購診所資料</div>';
+                } else {
+                    new Chart(document.getElementById('chartHmRegion'), {
+                        type: 'bar',
+                        data: {
+                            labels: hmRegionLabels,
+                            datasets: [{
+                                label: '健康醫購診所數',
+                                data: hmRegionData,
+                                backgroundColor: '#11998ecc',
+                                borderColor: '#11998e',
+                                borderWidth: 1,
+                                borderRadius: 6,
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                                x: { grid: { display: false } }
+                            }
+                        }
                     });
                 }
-            });
-            
-            const chartData = Object.entries(specialtyCount)
-                .map(([name, value]) => ({ name, value }))
-                .sort((a, b) => b.value - a.value);
-            
-            console.log('科別統計:', chartData);
-            
-            if (chartData.length === 0) {
-                chart.setOption({
-                    title: {
-                        text: '健康醫購診所沒有科別資料',
-                        left: 'center',
-                        top: 'center',
-                        textStyle: { color: '#999', fontSize: 16 }
-                    }
-                });
-                return;
+
+            } catch (err) {
+                console.error('載入統計失敗:', err);
+                document.querySelector('.container').innerHTML +=
+                    `<div style="color:red;padding:20px;">載入統計資料失敗：${err.message}</div>`;
             }
-            
-            const option = {
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    formatter: '{b}<br/>數量: {c} 間'
-                },
-                grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '3%',
-                    containLabel: true
-                },
-                xAxis: {
-                    type: 'category',
-                    data: chartData.map(d => d.name),
-                    axisLabel: { rotate: 45, fontSize: 12 },
-                    axisLine: { lineStyle: { color: '#ddd' } }
-                },
-                yAxis: {
-                    type: 'value',
-                    axisLine: { lineStyle: { color: '#ddd' } },
-                    splitLine: { lineStyle: { color: '#f0f0f0' } }
-                },
-                series: [{
-                    name: '數量',
-                    type: 'bar',
-                    data: chartData.map(d => d.value),
-                    itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: '#4ade80' },
-                            { offset: 1, color: '#22c55e' }
-                        ]),
-                        borderRadius: [8, 8, 0, 0]
-                    },
-                    label: {
-                        show: true,
-                        position: 'top',
-                        fontSize: 12,
-                        fontWeight: 'bold'
-                    }
-                }]
-            };
-            
-            chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
         }
 
-        // 5. 繪製健康醫購地區分布（只顯示健康醫購）
-        function drawHealthMallRegionChart(clinics) {
-            const chart = echarts.init(document.getElementById('healthMallRegionChart'));
-            
-            console.log('健康醫購地區分析 - 所有診所:', clinics.length);
-            
-            // 篩選健康醫購診所（只看 health_mall 欄位）
-            const healthMallClinics = clinics.filter(c => c.health_mall === '是');
-            
-            console.log('健康醫購診所數量:', healthMallClinics.length);
-            
-            // 如果沒有健康醫購診所
-            if (healthMallClinics.length === 0) {
-                chart.setOption({
-                    title: {
-                        text: '目前沒有健康醫購診所',
-                        left: 'center',
-                        top: 'center',
-                        textStyle: { color: '#999', fontSize: 16 }
-                    }
-                });
-                return;
-            }
-            
-            // 統計各地區的健康醫購數量
-            const regionCount = {};
-            healthMallClinics.forEach(clinic => {
-                if (clinic.region) {
-                    regionCount[clinic.region] = (regionCount[clinic.region] || 0) + 1;
-                }
-            });
-            
-            const chartData = Object.entries(regionCount)
-                .map(([name, value]) => ({ name, value }))
-                .sort((a, b) => b.value - a.value);
-            
-            console.log('地區統計:', chartData);
-            
-            const option = {
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    formatter: '{b}<br/>健康醫購: {c} 間'
-                },
-                grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '3%',
-                    containLabel: true
-                },
-                xAxis: {
-                    type: 'category',
-                    data: chartData.map(d => d.name),
-                    axisLabel: { rotate: 45, fontSize: 12 },
-                    axisLine: { lineStyle: { color: '#ddd' } }
-                },
-                yAxis: {
-                    type: 'value',
-                    axisLine: { lineStyle: { color: '#ddd' } },
-                    splitLine: { lineStyle: { color: '#f0f0f0' } }
-                },
-                series: [{
-                    name: '健康醫購',
-                    type: 'bar',
-                    data: chartData.map(d => d.value),
-                    itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: '#4ade80' },
-                            { offset: 1, color: '#22c55e' }
-                        ]),
-                        borderRadius: [8, 8, 0, 0]
-                    },
-                    label: {
-                        show: true,
-                        position: 'top',
-                        fontSize: 12,
-                        fontWeight: 'bold',
-                        color: '#22c55e'
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: '#22c55e' },
-                                { offset: 1, color: '#16a34a' }
-                            ])
-                        }
-                    }
-                }]
-            };
-            
-            chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
-        }
-
-        // 頁面載入時執行
-        document.addEventListener('DOMContentLoaded', loadAllData);
+        loadAndRender();
     </script>
 </body>
 </html>
