@@ -494,16 +494,30 @@ def campaign_match():
         ws = wb.active
         os.remove(temp_path)
 
+        # 以標題列取得欄位索引（不依賴固定 index）
+        header = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+        col = {name: idx for idx, name in enumerate(header)}
+        REQUIRED = {'電話'}
+        missing = REQUIRED - col.keys()
+        if missing:
+            return jsonify({'error': f'Excel 缺少必要欄位：{", ".join(missing)}'}), 400
+
+        def _get(row, name):
+            idx = col.get(name)
+            if idx is None or idx >= len(row):
+                return ''
+            return str(row[idx]).strip() if row[idx] is not None else ''
+
         # 讀取上傳名單（跳過標題列）
         uploaded = []
         for row in ws.iter_rows(min_row=2, values_only=True):
-            if not any(row[:4]):
+            if not any(row):
                 continue
-            phone_raw = str(row[3]).strip() if row[3] is not None else ''
+            phone_raw = _get(row, '電話')
             uploaded.append({
-                'region':   str(row[0] or '').strip(),
-                'district': str(row[1] or '').strip(),
-                'name':     str(row[2] or '').strip(),
+                'region':   _get(row, '縣市'),
+                'district': _get(row, '區域'),
+                'name':     _get(row, '診所名稱'),
                 'phone':    phone_raw,
                 'phone_n':  _normalize_phone(phone_raw),
             })
