@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活動比對 - Bcmedia 診所管理系統</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white; padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo { font-size: 32px; }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .nav { display: flex; gap: 10px; margin-top: 15px; }
+        .nav-btn {
+            background: rgba(255,255,255,0.25); color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 8px 20px; border-radius: 8px;
+            text-decoration: none; font-size: 14px;
+            transition: all 0.3s; display: inline-block;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.35); }
+        .nav-btn.active { background: white; color: #fa709a; border-color: white; }
+        .btn-logout {
+            background: rgba(255,255,255,0.25); color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.35); }
+
+        /* ── Layout ── */
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px; }
+
+        /* ── Upload card ── */
+        .upload-card {
+            background: white; border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 30px;
+            margin-bottom: 28px;
+        }
+        .upload-card h2 { font-size: 18px; color: #333; margin-bottom: 20px; }
+        .upload-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+        .form-field { display: flex; flex-direction: column; gap: 6px; }
+        .form-field label { font-size: 13px; font-weight: 600; color: #555; }
+        .form-field input[type="text"] {
+            padding: 11px 14px; border: 2px solid #e0e0e0; border-radius: 8px;
+            font-size: 14px; font-family: 'Noto Sans TC', sans-serif; width: 220px;
+        }
+        .form-field input[type="file"] {
+            padding: 9px 14px; border: 2px dashed #ccc; border-radius: 8px;
+            font-size: 13px; font-family: 'Noto Sans TC', sans-serif;
+            background: #fafafa; cursor: pointer; width: 260px;
+        }
+        .btn-match {
+            padding: 11px 28px;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white; border: none; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s;
+        }
+        .btn-match:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(250,112,154,0.35); }
+        .btn-match:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .hint {
+            margin-top: 14px; font-size: 12px; color: #888;
+            background: #f8f9fa; padding: 10px 14px; border-radius: 8px;
+        }
+
+        /* ── Summary bars ── */
+        .summary-row {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 16px; margin-bottom: 24px; display: none;
+        }
+        .summary-card {
+            padding: 20px; border-radius: 12px; text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .summary-card.green { background: #d4edda; border-left: 5px solid #28a745; }
+        .summary-card.red   { background: #f8d7da; border-left: 5px solid #dc3545; }
+        .summary-card.yellow{ background: #fff3cd; border-left: 5px solid #ffc107; }
+        .summary-num  { font-size: 36px; font-weight: 700; }
+        .summary-label{ font-size: 14px; font-weight: 600; margin-top: 4px; }
+        .summary-card.green  .summary-num  { color: #155724; }
+        .summary-card.red    .summary-num  { color: #721c24; }
+        .summary-card.yellow .summary-num  { color: #856404; }
+
+        /* ── Result blocks ── */
+        .result-block { display: none; margin-bottom: 24px; }
+        .result-block.visible { display: block; }
+        .block-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 20px; border-radius: 12px 12px 0 0; cursor: pointer;
+        }
+        .block-header.green  { background: #28a745; color: white; }
+        .block-header.red    { background: #dc3545; color: white; }
+        .block-header.yellow { background: #ffc107; color: #333; }
+        .block-title { font-size: 16px; font-weight: 700; }
+        .block-toggle { font-size: 18px; transition: transform 0.2s; }
+        .block-toggle.open { transform: rotate(180deg); }
+
+        .block-body {
+            background: white; border: 1px solid #e5e5e5; border-top: none;
+            border-radius: 0 0 12px 12px; overflow: hidden;
+        }
+        .block-body.hidden { display: none; }
+
+        /* filters inside red block */
+        .block-filters {
+            display: flex; gap: 12px; padding: 14px 16px; background: #fff5f5;
+            border-bottom: 1px solid #f0d0d0; flex-wrap: wrap; align-items: center;
+        }
+        .block-filters select {
+            padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 13px; font-family: 'Noto Sans TC', sans-serif;
+        }
+        .btn-export-block {
+            padding: 8px 18px; background: #dc3545; color: white;
+            border: none; border-radius: 6px; font-size: 13px;
+            font-weight: 600; cursor: pointer; margin-left: auto;
+        }
+        .btn-export-block:hover { background: #b02a37; }
+
+        /* table */
+        .result-table { width: 100%; border-collapse: collapse; }
+        .result-table th {
+            padding: 11px 12px; text-align: left; font-size: 13px;
+            font-weight: 600; color: #555; background: #f8f9fa;
+            border-bottom: 2px solid #e5e5e5; white-space: nowrap;
+        }
+        .result-table td {
+            padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
+        }
+        .result-table tbody tr:hover { background: #fafafa; }
+        .result-table td.specialty { white-space: normal; max-width: 160px; }
+        .specialty-tag {
+            display: inline-block; background: #e3f2fd; color: #1976d2;
+            padding: 2px 8px; border-radius: 10px; font-size: 11px; margin: 1px;
+        }
+        .empty-row td { text-align: center; color: #aaa; padding: 24px; }
+
+        .loading-bar {
+            display: none; text-align: center; padding: 30px; color: #888; font-size: 15px;
+        }
+
+        @media (max-width: 700px) {
+            .summary-row { grid-template-columns: 1fr; }
+            .upload-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <div class="header-top">
+        <div class="header-left">
+            <div class="logo">🎯</div>
+            <h1>活動比對</h1>
+        </div>
+        <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+    </div>
+    <div class="nav">
+        <a href="/" class="nav-btn">📋 診所管理</a>
+        <a href="/health-mall" class="nav-btn">🏪 健康醫購</a>
+        <a href="/campaign-match" class="nav-btn active">🎯 活動比對</a>
+        <a href="/analytics" class="nav-btn">📊 統計分析</a>
+    </div>
+</div>
+
+<div class="container">
+    <!-- 上傳區 -->
+    <div class="upload-card">
+        <h2>📂 上傳活動名單並與診所總表比對</h2>
+        <div class="upload-row">
+            <div class="form-field">
+                <label>活動名稱</label>
+                <input type="text" id="campaignName" placeholder="例如：舒跑2025" value="">
+            </div>
+            <div class="form-field">
+                <label>活動名單 Excel（.xlsx）</label>
+                <input type="file" id="uploadFile" accept=".xlsx">
+            </div>
+            <button class="btn-match" id="btnMatch" onclick="runMatch()">🔍 開始比對</button>
+        </div>
+        <div class="hint">
+            📋 Excel 欄位格式（第一列為標題）：<strong>縣市、區域、診所名稱、電話</strong><br>
+            比對依據：電話號碼（自動去除符號後比對）
+        </div>
+    </div>
+
+    <div class="loading-bar" id="loadingBar">⏳ 比對中，請稍候...</div>
+
+    <!-- 摘要 -->
+    <div class="summary-row" id="summaryRow">
+        <div class="summary-card green">
+            <div class="summary-num" id="numMatched">0</div>
+            <div class="summary-label">✅ 已參加</div>
+        </div>
+        <div class="summary-card red">
+            <div class="summary-num" id="numNotJoined">0</div>
+            <div class="summary-label">❌ 未參加（主要追蹤名單）</div>
+        </div>
+        <div class="summary-card yellow">
+            <div class="summary-num" id="numNotInSystem">0</div>
+            <div class="summary-label">⚠️ 系統未建立</div>
+        </div>
+    </div>
+
+    <!-- 已參加 -->
+    <div class="result-block" id="blockMatched">
+        <div class="block-header green" onclick="toggleBlock('matched')">
+            <span class="block-title">✅ 已參加診所</span>
+            <span class="block-toggle open" id="toggleMatched">▲</span>
+        </div>
+        <div class="block-body" id="bodyMatched">
+            <table class="result-table">
+                <thead>
+                    <tr><th>#</th><th>縣市</th><th>區域</th><th>診所名稱</th><th>科別</th><th>電話</th><th>負責人</th></tr>
+                </thead>
+                <tbody id="tableMatched"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 未參加 -->
+    <div class="result-block" id="blockNotJoined">
+        <div class="block-header red" onclick="toggleBlock('notJoined')">
+            <span class="block-title">❌ 未參加診所（系統有、名單沒有）</span>
+            <span class="block-toggle open" id="toggleNotJoined">▲</span>
+        </div>
+        <div class="block-body" id="bodyNotJoined">
+            <div class="block-filters">
+                <select id="filterNJRegion" onchange="renderNotJoined()">
+                    <option value="">全部縣市</option>
+                </select>
+                <select id="filterNJSpecialty" onchange="renderNotJoined()">
+                    <option value="">全部科別</option>
+                    <option value="小兒科">小兒科</option>
+                    <option value="家醫科">家醫科</option>
+                    <option value="耳鼻喉科">耳鼻喉科</option>
+                    <option value="內科">內科</option>
+                    <option value="外科">外科</option>
+                    <option value="醫美">醫美</option>
+                    <option value="皮膚科">皮膚科</option>
+                    <option value="婦產科">婦產科</option>
+                    <option value="泌尿科">泌尿科</option>
+                    <option value="復健/骨科">復健/骨科</option>
+                    <option value="牙科">牙科</option>
+                    <option value="中醫">中醫</option>
+                    <option value="產後護理之家">產後護理之家</option>
+                </select>
+                <button class="btn-export-block" onclick="exportNotJoined()">📥 匯出未參加名單</button>
+            </div>
+            <table class="result-table">
+                <thead>
+                    <tr><th>#</th><th>縣市</th><th>區域</th><th>診所名稱</th><th>科別</th><th>地址</th><th>電話</th><th>負責人</th></tr>
+                </thead>
+                <tbody id="tableNotJoined"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 系統未建立 -->
+    <div class="result-block" id="blockNotInSystem">
+        <div class="block-header yellow" onclick="toggleBlock('notInSystem')">
+            <span class="block-title">⚠️ 系統未建立診所（名單有、系統沒有）</span>
+            <span class="block-toggle open" id="toggleNotInSystem">▲</span>
+        </div>
+        <div class="block-body" id="bodyNotInSystem">
+            <table class="result-table">
+                <thead>
+                    <tr><th>#</th><th>縣市</th><th>區域</th><th>診所名稱</th><th>電話</th></tr>
+                </thead>
+                <tbody id="tableNotInSystem"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let _notJoined = [];    // 完整未參加清單（從 server 回傳）
+
+    async function runMatch() {
+        const file = document.getElementById('uploadFile').files[0];
+        if (!file) { alert('請先選擇 Excel 檔案'); return; }
+
+        const btn = document.getElementById('btnMatch');
+        btn.disabled = true;
+        document.getElementById('loadingBar').style.display = 'block';
+        hideSummaryAndBlocks();
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/api/campaign/match', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (!res.ok) { alert(data.error || '比對失敗'); return; }
+
+            _notJoined = data.not_joined;
+
+            // 摘要數字
+            document.getElementById('numMatched').textContent    = data.matched.length;
+            document.getElementById('numNotJoined').textContent  = data.not_joined.length;
+            document.getElementById('numNotInSystem').textContent = data.not_in_system.length;
+            document.getElementById('summaryRow').style.display  = 'grid';
+
+            // 填入縣市篩選選項（從 not_joined 收集）
+            const regions = [...new Set(data.not_joined.map(c => c.region).filter(Boolean))].sort();
+            const rSel = document.getElementById('filterNJRegion');
+            rSel.innerHTML = '<option value="">全部縣市</option>';
+            regions.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r; opt.textContent = r;
+                rSel.appendChild(opt);
+            });
+
+            // 已參加
+            renderSimpleTable('tableMatched', data.matched, ['region','district','name','specialties','phone','contact_person']);
+            showBlock('blockMatched');
+
+            // 未參加（含篩選）
+            renderNotJoined();
+            showBlock('blockNotJoined');
+
+            // 系統未建立
+            renderNotInSystem(data.not_in_system);
+            showBlock('blockNotInSystem');
+
+        } catch (err) {
+            console.error(err);
+            alert('比對時發生錯誤：' + err.message);
+        } finally {
+            btn.disabled = false;
+            document.getElementById('loadingBar').style.display = 'none';
+        }
+    }
+
+    function renderNotJoined() {
+        const regionFilter    = document.getElementById('filterNJRegion').value;
+        const specialtyFilter = document.getElementById('filterNJSpecialty').value;
+
+        const filtered = _notJoined.filter(c => {
+            if (regionFilter && c.region !== regionFilter) return false;
+            if (specialtyFilter && !(c.specialties || '').includes(specialtyFilter)) return false;
+            return true;
+        });
+
+        const tbody = document.getElementById('tableNotJoined');
+        tbody.innerHTML = '';
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="8">沒有符合條件的診所</td></tr>';
+            return;
+        }
+
+        filtered.forEach((c, i) => {
+            const specTags = (c.specialties || '').split(',').filter(Boolean)
+                .map(s => `<span class="specialty-tag">${s.trim()}</span>`).join('');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${i + 1}</td>
+                <td>${c.region}</td>
+                <td>${c.district}</td>
+                <td><strong>${c.name}</strong></td>
+                <td class="specialty">${specTags || '-'}</td>
+                <td title="${c.address}">${c.address || '-'}</td>
+                <td>${c.phone}</td>
+                <td>${c.contact_person}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderSimpleTable(tbodyId, rows, keys) {
+        const tbody = document.getElementById(tbodyId);
+        tbody.innerHTML = '';
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr class="empty-row"><td colspan="${keys.length + 1}">無資料</td></tr>`;
+            return;
+        }
+        rows.forEach((c, i) => {
+            const tr = document.createElement('tr');
+            const cells = keys.map(k => {
+                if (k === 'specialties') {
+                    const tags = (c[k] || '').split(',').filter(Boolean)
+                        .map(s => `<span class="specialty-tag">${s.trim()}</span>`).join('');
+                    return `<td class="specialty">${tags || '-'}</td>`;
+                }
+                return `<td>${c[k] || ''}</td>`;
+            }).join('');
+            tr.innerHTML = `<td>${i + 1}</td>${cells}`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderNotInSystem(rows) {
+        const tbody = document.getElementById('tableNotInSystem');
+        tbody.innerHTML = '';
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="5">無資料</td></tr>';
+            return;
+        }
+        rows.forEach((c, i) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${c.region || ''}</td>
+                    <td>${c.district || ''}</td>
+                    <td><strong>${c.name || ''}</strong></td>
+                    <td>${c.phone || ''}</td>
+                </tr>`;
+        });
+    }
+
+    function exportNotJoined() {
+        const regionFilter    = document.getElementById('filterNJRegion').value;
+        const specialtyFilter = document.getElementById('filterNJSpecialty').value;
+        const campaign = document.getElementById('campaignName').value.trim() || '活動';
+
+        const filtered = _notJoined.filter(c => {
+            if (regionFilter && c.region !== regionFilter) return false;
+            if (specialtyFilter && !(c.specialties || '').includes(specialtyFilter)) return false;
+            return true;
+        });
+
+        if (filtered.length === 0) { alert('目前篩選結果為空，無法匯出'); return; }
+
+        const ids = filtered.map(c => c.id).join(',');
+        const params = new URLSearchParams({ ids, campaign });
+        window.location.href = `/api/campaign/export-not-joined?${params}`;
+    }
+
+    function toggleBlock(name) {
+        const bodyMap = { matched: 'bodyMatched', notJoined: 'bodyNotJoined', notInSystem: 'bodyNotInSystem' };
+        const toggleMap = { matched: 'toggleMatched', notJoined: 'toggleNotJoined', notInSystem: 'toggleNotInSystem' };
+        const body   = document.getElementById(bodyMap[name]);
+        const toggle = document.getElementById(toggleMap[name]);
+        body.classList.toggle('hidden');
+        toggle.classList.toggle('open');
+    }
+
+    function showBlock(id) {
+        document.getElementById(id).classList.add('visible');
+    }
+
+    function hideSummaryAndBlocks() {
+        document.getElementById('summaryRow').style.display = 'none';
+        ['blockMatched', 'blockNotJoined', 'blockNotInSystem'].forEach(id => {
+            document.getElementById(id).classList.remove('visible');
+        });
+        ['bodyMatched', 'bodyNotJoined', 'bodyNotInSystem'].forEach(id => {
+            document.getElementById(id).classList.remove('hidden');
+        });
+        ['toggleMatched', 'toggleNotJoined', 'toggleNotInSystem'].forEach(id => {
+            document.getElementById(id).classList.add('open');
+        });
+    }
+</script>
+</body>
+</html>

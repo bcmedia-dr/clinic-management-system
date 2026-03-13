@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
-import os
+import os, re
 from collections import Counter
+from io import BytesIO
+from openpyxl import Workbook, load_workbook
 from werkzeug.utils import secure_filename
 from export import export_clinics
 from import_data import import_clinics
@@ -65,6 +67,12 @@ def analytics():
     if 'user' not in session:
         return redirect(url_for('login'))
     return render_template('analytics.html')
+
+@app.route('/campaign-match')
+def campaign_match_page():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('campaign_match.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -466,7 +474,144 @@ def import_data():
     return jsonify(result)
 
 
+# ── 活動比對 API ─────────────────────────────────────────────
+
+@app.route('/api/campaign/match', methods=['POST'])
+def campaign_match():
+    if 'file' not in request.files:
+        return jsonify({'error': '沒有上傳檔案'}), 400
+
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': '只接受 .xlsx 格式'}), 400
+
+    filename = secure_filename(file.filename)
+    temp_path = os.path.join('/tmp', filename)
+    file.save(temp_path)
+
+    try:
+        wb = load_workbook(temp_path)
+        ws = wb.active
+        os.remove(temp_path)
+
+        # 讀取上傳名單（跳過標題列）
+        uploaded = []
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not any(row[:4]):
+                continue
+            phone_raw = str(row[3]).strip() if row[3] is not None else ''
+            uploaded.append({
+                'region':   str(row[0] or '').strip(),
+                'district': str(row[1] or '').strip(),
+                'name':     str(row[2] or '').strip(),
+                'phone':    phone_raw,
+                'phone_n':  _normalize_phone(phone_raw),
+            })
+
+        # 取得所有診所，建立電話 → 診所 map
+        clinics = Clinic.query.all()
+        phone_to_clinic = {}
+        for c in clinics:
+            np = _normalize_phone(c.phone)
+            if np:
+                phone_to_clinic[np] = c
+
+        uploaded_phones = {u['phone_n'] for u in uploaded if u['phone_n']}
+
+        # 已參加：上傳名單的電話在系統有對應
+        matched = []
+        for u in uploaded:
+            if u['phone_n'] and u['phone_n'] in phone_to_clinic:
+                matched.append(_clinic_brief(phone_to_clinic[u['phone_n']]))
+
+        # 未參加：系統有、但上傳名單沒有
+        not_joined = []
+        for c in clinics:
+            np = _normalize_phone(c.phone)
+            if not np or np not in uploaded_phones:
+                not_joined.append(_clinic_brief(c))
+
+        # 系統未建立：上傳名單有、系統沒有
+        not_in_system = []
+        for u in uploaded:
+            if not u['phone_n'] or u['phone_n'] not in phone_to_clinic:
+                not_in_system.append({
+                    'region':   u['region'],
+                    'district': u['district'],
+                    'name':     u['name'],
+                    'phone':    u['phone'],
+                })
+
+        return jsonify({
+            'matched':        matched,
+            'not_joined':     not_joined,
+            'not_in_system':  not_in_system,
+        })
+
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return jsonify({'error': f'比對失敗: {str(e)}'}), 500
+
+
+@app.route('/api/campaign/export-not-joined')
+def export_not_joined():
+    ids_str  = request.args.get('ids', '')
+    campaign = request.args.get('campaign', '活動')
+
+    if not ids_str:
+        return jsonify({'error': '沒有診所 ID'}), 400
+
+    try:
+        ids = [int(i) for i in ids_str.split(',') if i.strip().isdigit()]
+    except ValueError:
+        return jsonify({'error': '無效的 ID 格式'}), 400
+
+    clinics = Clinic.query.filter(Clinic.id.in_(ids)).all()
+    if not clinics:
+        return jsonify({'error': '沒有符合條件的資料'}), 400
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '未參加診所'
+    ws.append(['縣市', '區域', '診所名稱', '科別', '地址', '電話', '負責人'])
+    for c in clinics:
+        ws.append([
+            c.region or '', c.district or '', c.name or '',
+            c.specialties or '', c.address or '',
+            c.phone or '', c.contact_person or '',
+        ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f'{campaign}_未參加診所_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
 # ── 工具函式 ─────────────────────────────────────────────────
+
+def _normalize_phone(phone):
+    """去除非數字字元，用於電話比對"""
+    return re.sub(r'\D', '', str(phone)) if phone else ''
+
+def _clinic_brief(c):
+    return {
+        'id':             c.id,
+        'region':         c.region or '',
+        'district':       c.district or '',
+        'name':           c.name or '',
+        'specialties':    c.specialties or '',
+        'address':        c.address or '',
+        'phone':          c.phone or '',
+        'contact_person': c.contact_person or '',
+    }
 
 def _parse_date(s):
     if s:
