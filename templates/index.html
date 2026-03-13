@@ -108,9 +108,9 @@
             padding: 30px;
         }
 
-        .stats, .stats-container {
+        .stats-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -133,28 +133,18 @@
             color: white;
         }
 
-        .stat-card.health-mall-yes {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-        }
-
-        .stat-card.health-mall-no {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-        }
-
         .stat-icon {
             font-size: 40px;
             margin-bottom: 10px;
         }
 
-        .stat-title, .stat-label {
+        .stat-label {
             font-size: 14px;
             opacity: 0.9;
             margin-bottom: 5px;
         }
 
-        .stat-number, .stat-value {
+        .stat-value {
             font-size: 36px;
             font-weight: 700;
         }
@@ -268,7 +258,7 @@
             background: white;
             border-radius: 15px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            overflow-x: auto; /* 允許橫向滾動以顯示所有列 */
+            overflow-x: auto;
             overflow-y: visible;
         }
 
@@ -276,11 +266,7 @@
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
-            min-width: 1350px; /* 確保表格有足夠寬度 */
-        }
-        
-        .table-container {
-            overflow-x: auto; /* 允許橫向滾動 */
+            min-width: 1100px;
         }
 
         thead {
@@ -296,18 +282,16 @@
             white-space: nowrap;
         }
 
-        th:nth-child(1) { width: 50px; }  /* 選擇 */
-        th:nth-child(2) { width: 50px; }  /* 編號 */
-        th:nth-child(3) { width: 70px; }  /* 縣市 */
-        th:nth-child(4) { width: 70px; }  /* 區域 */
-        th:nth-child(5) { width: 150px; } /* 診所名稱 */
-        th:nth-child(6) { width: 140px; } /* 科別 */
-        th:nth-child(7) { width: 120px; } /* 電話 */
-        th:nth-child(8) { width: 100px; } /* 負責人 */
-        th:nth-child(9) { width: 150px; } /* 媒體項目 */
-        th:nth-child(10) { width: 90px; }  /* 健康醫購 */
-        th:nth-child(11) { width: 70px; }  /* 百位 */
-        th:nth-child(12) { width: 150px; min-width: 150px; } /* 操作 */
+        th:nth-child(1) { width: 50px; }   /* 選擇 */
+        th:nth-child(2) { width: 50px; }   /* 編號 */
+        th:nth-child(3) { width: 80px; }   /* 縣市 */
+        th:nth-child(4) { width: 80px; }   /* 區域 */
+        th:nth-child(5) { width: 160px; }  /* 診所名稱 */
+        th:nth-child(6) { width: 140px; }  /* 科別 */
+        th:nth-child(7) { width: 120px; }  /* 電話 */
+        th:nth-child(8) { width: 90px; }   /* 負責人 */
+        th:nth-child(9) { width: 210px; }  /* 合作項目 */
+        th:nth-child(10) { width: 140px; min-width: 140px; } /* 操作 */
 
         td {
             padding: 12px 10px;
@@ -318,11 +302,10 @@
             vertical-align: middle;
         }
 
-        td:nth-child(4) { /* 診所名稱 */
+        td:nth-child(5) { /* 診所名稱 */
             font-weight: 600;
         }
 
-        /* 確保所有欄位都有適當的 tooltip */
         td[title] {
             cursor: help;
         }
@@ -335,23 +318,47 @@
             background: #f8f9fa;
         }
 
-        .badge {
+        td:nth-child(6) { /* 科別 */
+            white-space: normal;
+            overflow: visible;
+        }
+
+        td:nth-child(9) { /* 合作項目 */
+            white-space: normal;
+            overflow: visible;
+        }
+
+        td:nth-child(10) { /* 操作 */
+            white-space: nowrap;
+            overflow: visible;
+            padding: 12px 8px;
+        }
+
+        .specialty-tag {
             display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin: 2px 2px 2px 0;
+            white-space: nowrap;
+        }
+
+        .col-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 15px;
             font-size: 12px;
             font-weight: 600;
+            margin: 2px 2px 2px 0;
+            white-space: nowrap;
         }
 
-        .badge.yes {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .badge.no {
-            background: #f8d7da;
-            color: #721c24;
-        }
+        .col-tag.yaodai  { background: #fff3cd; color: #856404; }
+        .col-tag.haibao  { background: #d4edda; color: #155724; }
+        .col-tag.paiyang { background: #cce5ff; color: #004085; }
+        .col-tag.baiwei  { background: #f8d7da; color: #721c24; }
 
         .btn-edit, .btn-delete, .btn-detail {
             padding: 6px 12px;
@@ -368,36 +375,6 @@
             color: white;
             display: inline-block;
             flex-shrink: 0;
-        }
-
-        td:nth-child(6) { /* 科別 */
-            white-space: normal;
-            overflow: visible;
-        }
-        
-        td:nth-child(10) { /* 健康醫購 */
-            position: relative;
-        }
-        
-        td:nth-child(11) { /* 百位 */
-            position: relative;
-        }
-
-        td:nth-child(9) { /* 媒體項目 */
-            white-space: normal;
-            overflow: visible;
-            position: relative;
-        }
-
-        td:nth-child(12) { /* 操作欄位 */
-            white-space: nowrap;
-            overflow: visible;
-            padding: 12px 8px;
-        }
-        
-        /* 確保操作列按鈕容器有足夠空間 */
-        td:nth-child(12) button:last-child {
-            margin-right: 0;
         }
 
         .btn-edit {
@@ -602,89 +579,6 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
         }
-
-        .specialty-tag {
-            display: inline-block;
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            margin: 2px 2px 2px 0;
-            white-space: nowrap;
-        }
-        
-        .status-tag {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
-        
-        .status-tag:hover {
-            transform: scale(1.05);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        
-        .status-tag.yes {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-tag.no {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .media-empty {
-            color: #999;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: all 0.2s;
-            display: inline-block;
-        }
-        
-        .media-empty:hover {
-            background: #f0f0f0;
-            color: #667eea;
-        }
-        
-        .media-dropdown {
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            padding: 10px;
-            z-index: 1000;
-            min-width: 150px;
-            display: none;
-        }
-        
-        .media-dropdown.active {
-            display: block;
-        }
-        
-        .media-dropdown-item {
-            padding: 8px 12px;
-            cursor: pointer;
-            border-radius: 4px;
-            margin: 2px 0;
-            transition: all 0.2s;
-        }
-        
-        .media-dropdown-item:hover {
-            background: #f0f0f0;
-        }
-        
-        .media-dropdown-item input[type="checkbox"] {
-            margin-right: 8px;
-        }
-
     </style>
 </head>
 <body>
@@ -709,30 +603,32 @@
     </div>
 
     <div class="container">
+        <!-- 儀表板：左=總診所數，中=合作項目計數，右=科別計數 -->
         <div class="stats-container">
-            <div class="stat-card">
+            <div class="stat-card total">
                 <div class="stat-icon">🏥</div>
                 <div class="stat-label">總診所數</div>
                 <div class="stat-value" id="totalCount">0</div>
             </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon">✅</div>
-                <div class="stat-label">健康醫購</div>
-                <div class="stat-value" id="healthMallCount">0</div>
+
+            <div class="stat-card" id="colItemStatCard" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+                <div class="stat-icon">📦</div>
+                <div class="stat-label" id="colItemStatLabel">合作項目</div>
+                <div class="stat-value" id="colItemStatValue">-</div>
             </div>
-            
-            <div class="stat-card" id="specialtyStatCard">
+
+            <div class="stat-card" id="specialtyStatCard" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
                 <div class="stat-icon">🏷️</div>
-                <div class="stat-label" id="specialtyStatLabel">篩選科別</div>
+                <div class="stat-label" id="specialtyStatLabel">科別</div>
                 <div class="stat-value" id="specialtyStatValue">-</div>
             </div>
         </div>
 
+        <!-- 篩選列 -->
         <div class="controls">
             <div class="controls-row">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="🔍 搜尋診所名稱、地址、負責人...">
+                    <input type="text" id="searchInput" placeholder="🔍 搜尋診所名稱、負責人...">
                 </div>
                 <select class="filter-select" id="filterRegion">
                     <option value="">請選擇地區</option>
@@ -772,6 +668,13 @@
                     <option value="中醫">中醫</option>
                     <option value="產後護理之家">產後護理之家</option>
                 </select>
+                <select class="filter-select" id="filterColItem">
+                    <option value="">合作項目</option>
+                    <option value="yaodai">藥袋</option>
+                    <option value="haibao">海報/立牌</option>
+                    <option value="paiyang">派樣</option>
+                    <option value="baiwei">百位</option>
+                </select>
                 <button class="btn-add" onclick="showAddModal()">➕ 新增診所</button>
                 <button class="btn-delete-batch" onclick="deleteSelected()" id="btnDeleteBatch" style="display: none;">🗑️ 刪除選中</button>
                 <button class="btn-export" onclick="exportData()">📥 匯出 Excel</button>
@@ -779,6 +682,7 @@
             </div>
         </div>
 
+        <!-- 診所表格 -->
         <div class="table-container">
             <table>
                 <thead>
@@ -791,9 +695,7 @@
                         <th>科別</th>
                         <th>電話</th>
                         <th>負責人</th>
-                        <th>媒體項目</th>
-                        <th>健康醫購</th>
-                        <th>百位</th>
+                        <th>合作項目</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -803,7 +705,7 @@
         </div>
     </div>
 
-    <!-- Modal省略，與之前相同 -->
+    <!-- 新增/編輯 Modal -->
     <div class="modal" id="clinicModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -812,7 +714,7 @@
             </div>
             <form id="clinicForm">
                 <input type="hidden" id="clinicId">
-                
+
                 <div class="form-group">
                     <label>縣市 *</label>
                     <select id="region" required>
@@ -866,7 +768,7 @@
 
                 <div class="form-group">
                     <label>科別 *（可複選）</label>
-                    <div class="checkbox-group">
+                    <div class="checkbox-group" id="specialtyGroup">
                         <label><input type="checkbox" value="小兒科"> 小兒科</label>
                         <label><input type="checkbox" value="家醫科"> 家醫科</label>
                         <label><input type="checkbox" value="耳鼻喉科"> 耳鼻喉科</label>
@@ -884,30 +786,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label>媒體項目 *（可複選）</label>
+                    <label>合作項目（可複選）</label>
                     <div class="checkbox-group">
-                        <label><input type="checkbox" value="藥袋" class="media-item"> 藥袋</label>
-                        <label><input type="checkbox" value="海報" class="media-item"> 海報</label>
-                        <label><input type="checkbox" value="櫃檯" class="media-item"> 櫃檯</label>
-                        <label><input type="checkbox" value="派樣" class="media-item"> 派樣</label>
-                        <label><input type="checkbox" value="全選" class="media-item" id="mediaAll"> 全選</label>
+                        <label><input type="checkbox" id="colYaodai"> 藥袋</label>
+                        <label><input type="checkbox" id="colHaibao"> 海報/立牌</label>
+                        <label><input type="checkbox" id="colPaiyang"> 派樣</label>
+                        <label><input type="checkbox" id="colBaiwei"> 百位</label>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label>健康醫購 *</label>
-                    <select id="healthMall" required>
-                        <option value="否">否</option>
-                        <option value="是">是</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>百位 *</label>
-                    <select id="hundredPosition" required>
-                        <option value="否">否</option>
-                        <option value="是">是</option>
-                    </select>
                 </div>
 
                 <div class="form-group">
@@ -924,771 +809,6 @@
             </form>
         </div>
     </div>
-
-    <script>
-        let currentEditId = null;
-
-        document.addEventListener('DOMContentLoaded', () => {
-            loadStats();
-            loadClinics();
-            setupEventListeners();
-        });
-
-        function setupEventListeners() {
-            // 篩選變更事件
-            document.getElementById('filterRegion').addEventListener('change', applyFilters);
-            document.getElementById('filterSpecialty').addEventListener('change', applyFilters);
-            const filterMediaItem = document.getElementById('filterMediaItem');
-            if (filterMediaItem) {
-                filterMediaItem.addEventListener('change', applyFilters);
-            }
-            
-            // 搜尋框變更事件
-            document.getElementById('searchInput').addEventListener('input', applyFilters);
-            
-            document.getElementById('clinicForm').addEventListener('submit', handleSubmit);
-            
-            // 全選功能（使用事件委派，因為表格是動態生成的）
-            document.addEventListener('change', function(e) {
-                if (e.target.id === 'selectAll') {
-                    const checkboxes = document.querySelectorAll('.clinic-checkbox');
-                    checkboxes.forEach(cb => cb.checked = e.target.checked);
-                    updateDeleteButton();
-                } else if (e.target.classList.contains('clinic-checkbox')) {
-                    updateSelectAllState();
-                    updateDeleteButton();
-                }
-            });
-            
-            // 媒體項目「全選」的邏輯
-            const mediaAllCheckbox = document.getElementById('mediaAll');
-            if (mediaAllCheckbox) {
-                mediaAllCheckbox.addEventListener('change', function() {
-                    const mediaItems = document.querySelectorAll('.media-item:not(#mediaAll)');
-                    if (this.checked) {
-                        mediaItems.forEach(item => item.checked = true);
-                    }
-                });
-                
-                // 當其他媒體項目取消選中時，取消「全選」
-                document.querySelectorAll('.media-item:not(#mediaAll)').forEach(item => {
-                    item.addEventListener('change', function() {
-                        if (!this.checked) {
-                            mediaAllCheckbox.checked = false;
-                        } else {
-                            // 檢查是否所有項目都已選中
-                            const allChecked = Array.from(document.querySelectorAll('.media-item:not(#mediaAll)')).every(cb => cb.checked);
-                            if (allChecked) {
-                                mediaAllCheckbox.checked = true;
-                            }
-                        }
-                    });
-                });
-            }
-        }
-        
-        function updateSelectAllState() {
-            const checkboxes = document.querySelectorAll('.clinic-checkbox');
-            const selectAll = document.getElementById('selectAll');
-            if (checkboxes.length === 0) {
-                if (selectAll) selectAll.checked = false;
-                return;
-            }
-            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-            const someChecked = Array.from(checkboxes).some(cb => cb.checked);
-            if (selectAll) {
-                selectAll.checked = allChecked;
-                selectAll.indeterminate = someChecked && !allChecked;
-            }
-        }
-        
-        function updateDeleteButton() {
-            const checkedBoxes = document.querySelectorAll('.clinic-checkbox:checked');
-            const deleteBtn = document.getElementById('btnDeleteBatch');
-            if (deleteBtn) {
-                if (checkedBoxes.length > 0) {
-                    deleteBtn.style.display = 'inline-block';
-                } else {
-                    deleteBtn.style.display = 'none';
-                }
-            }
-        }
-        
-        async function deleteSelected() {
-            const checkedBoxes = document.querySelectorAll('.clinic-checkbox:checked');
-            if (checkedBoxes.length === 0) {
-                alert('請選擇要刪除的診所');
-                return;
-            }
-            
-            const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute('data-clinic-id'));
-            const count = selectedIds.length;
-            
-            if (!confirm(`確定要刪除選中的 ${count} 筆診所資料嗎？此操作無法復原。`)) {
-                return;
-            }
-            
-            try {
-                // 批量刪除
-                const deletePromises = selectedIds.map(id => 
-                    fetch(`/api/clinics/${id}`, { method: 'DELETE' })
-                );
-                
-                const results = await Promise.all(deletePromises);
-                const failed = results.filter(r => !r.ok);
-                
-                if (failed.length > 0) {
-                    alert(`刪除完成，但有 ${failed.length} 筆資料刪除失敗`);
-                } else {
-                    alert(`成功刪除 ${count} 筆資料`);
-                }
-                
-                // 重新載入資料
-                loadStats();
-                loadClinics();
-                const selectAll = document.getElementById('selectAll');
-                if (selectAll) selectAll.checked = false;
-                updateDeleteButton();
-            } catch (error) {
-                console.error('批量刪除失敗:', error);
-                alert('批量刪除失敗，請稍後再試');
-            }
-        }
-
-        async function loadStats() {
-            try {
-                // 取得當前篩選條件
-                const search = document.getElementById('searchInput').value;
-                const region = document.getElementById('filterRegion').value;
-                const specialty = document.getElementById('filterSpecialty').value;
-                const mediaItem = document.getElementById('filterMediaItem') ? document.getElementById('filterMediaItem').value : '';
-                
-                // 建立查詢參數
-                const params = new URLSearchParams();
-                if (search) params.append('search', search);
-                if (region) params.append('region', region);
-                if (specialty) params.append('specialty', specialty);
-                if (mediaItem) params.append('media_item', mediaItem);
-                
-                // 取得篩選後的診所列表
-                const response = await fetch(`/api/clinics?${params}`);
-                const clinics = await response.json();
-                
-                // 計算統計數據
-                const totalCount = clinics.length;
-                const healthMallCount = clinics.filter(c => c.media_items && c.media_items.includes('全部')).length;
-                
-                // 更新統計卡片
-                document.getElementById('totalCount').textContent = totalCount;
-                document.getElementById('healthMallCount').textContent = healthMallCount;
-                
-                // 更新科別統計卡片
-                const specialtyCard = document.getElementById('specialtyStatCard');
-                const specialtyLabel = document.getElementById('specialtyStatLabel');
-                const specialtyValue = document.getElementById('specialtyStatValue');
-                
-                if (specialty) {
-                    // 有篩選科別時顯示該科別的數量
-                    specialtyLabel.textContent = specialty;
-                    specialtyValue.textContent = totalCount + ' 間';
-                    specialtyCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                    specialtyCard.style.color = 'white';
-                } else {
-                    // 沒有篩選時顯示預設
-                    specialtyLabel.textContent = '請選擇科別';
-                    specialtyValue.textContent = '-';
-                    specialtyCard.style.background = 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
-                    specialtyCard.style.color = '#333';
-                }
-                
-            } catch (error) {
-                console.error('載入統計失敗:', error);
-            }
-        }
-
-        function applyFilters() {
-            loadClinics();
-            loadStats();
-        }
-
-        async function loadClinics() {
-            const search = document.getElementById('searchInput').value;
-            const region = document.getElementById('filterRegion').value;
-            const specialty = document.getElementById('filterSpecialty').value;
-
-            const params = new URLSearchParams();
-            if (search) params.append('search', search);
-            if (region) params.append('region', region);
-            if (specialty) params.append('specialty', specialty);
-
-            try {
-                const response = await fetch(`/api/clinics?${params}`);
-                const clinics = await response.json();
-                displayClinics(clinics);
-            } catch (error) {
-                console.error('載入診所資料失敗:', error);
-            }
-        }
-
-        function displayClinics(clinics) {
-            const tbody = document.getElementById('clinicsTable');
-            tbody.innerHTML = '';
-
-            clinics.forEach((clinic, index) => {
-                const row = document.createElement('tr');
-                row.setAttribute('data-clinic-id', clinic.id);
-                
-                // 自動編號（從1開始）
-                const displayNumber = index + 1;
-                
-                const specialties = clinic.specialties ? clinic.specialties.split(',').map(s => 
-                    `<span class="specialty-tag">${s.trim()}</span>`
-                ).join(' ') : '';
-
-                let mediaItemsDisplay;
-                if (clinic.media_items && clinic.media_items.trim()) {
-                    const items = clinic.media_items.split(',').map(m => m.trim());
-                    mediaItemsDisplay = items.map(m => 
-                        `<span class="specialty-tag" style="background: #fff3cd; color: #856404;">${m}</span>`
-                    ).join(' ');
-                    mediaItemsDisplay += ` <span class="media-empty" onclick="showMediaDropdown(${clinic.id}, event)" style="font-size: 12px; margin-left: 4px;">✏️</span>`;
-                } else {
-                    mediaItemsDisplay = `<span class="media-empty" onclick="showMediaDropdown(${clinic.id}, event)" data-clinic-id="${clinic.id}">無</span>`;
-                }
-
-                const healthMallValue = clinic.health_mall || '否';
-                const hundredPositionValue = clinic.hundred_position || '否';
-                const healthMallTag = `<span class="status-tag ${healthMallValue === '是' ? 'yes' : 'no'}" onclick="toggleHealthMall(${clinic.id}, event)" style="cursor: pointer;">${healthMallValue}</span>`;
-                const hundredPositionTag = `<span class="status-tag ${hundredPositionValue === '是' ? 'yes' : 'no'}" onclick="toggleHundredPosition(${clinic.id}, event)" style="cursor: pointer;">${hundredPositionValue}</span>`;
-                
-                row.innerHTML = `
-                    <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${clinic.id}"></td>
-                    <td>${displayNumber}</td>
-                    <td>${clinic.region || ''}</td>
-                    <td>${clinic.district || ''}</td>
-                    <td title="${clinic.name}">${clinic.name}</td>
-                    <td>${specialties}</td>
-                    <td>${clinic.phone || ''}</td>
-                    <td>${clinic.contact_person || ''}</td>
-                    <td class="media-cell" data-clinic-id="${clinic.id}">${mediaItemsDisplay}</td>
-                    <td class="health-mall-cell" data-clinic-id="${clinic.id}">${healthMallTag}</td>
-                    <td class="hundred-position-cell" data-clinic-id="${clinic.id}">${hundredPositionTag}</td>
-                    <td>
-                        <button class="btn-edit" onclick="editClinic(${clinic.id})">編輯</button>
-                        <button class="btn-detail" onclick="toggleDetail(${clinic.id})">詳細</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-
-                // 創建詳細資訊行
-                const detailRow = document.createElement('tr');
-                detailRow.className = 'detail-row';
-                detailRow.setAttribute('data-detail-for', clinic.id);
-                detailRow.innerHTML = `
-                    <td colspan="12">
-                        <div class="detail-content">
-                            <h4>詳細資訊</h4>
-                            <div class="detail-info">
-                                <div class="detail-item">
-                                    <label>地址</label>
-                                    <span>${clinic.address || '未設定'}</span>
-                                </div>
-                                <div class="detail-item">
-                                    <label>營業時間</label>
-                                    <span>${clinic.business_hours || '未設定'}</span>
-                                </div>
-                                <div class="detail-item">
-                                    <label>備註</label>
-                                    <span>${clinic.note || '無備註'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(detailRow);
-            });
-        }
-
-        function toggleDetail(clinicId) {
-            const detailRow = document.querySelector(`tr[data-detail-for="${clinicId}"]`);
-            if (!detailRow) return;
-
-            // 關閉其他已展開的詳細資訊
-            document.querySelectorAll('.detail-row.active').forEach(row => {
-                if (row !== detailRow) {
-                    row.classList.remove('active');
-                }
-            });
-
-            // 切換當前詳細資訊的顯示狀態
-            detailRow.classList.toggle('active');
-        }
-
-        function showAddModal() {
-            currentEditId = null;
-            document.getElementById('modalTitle').textContent = '新增診所';
-            document.getElementById('clinicForm').reset();
-            document.getElementById('clinicId').value = '';
-            document.getElementById('address').value = '';
-            document.querySelectorAll('.checkbox-group input[type="checkbox"]').forEach(cb => {
-                cb.checked = false;
-            });
-            document.getElementById('clinicModal').style.display = 'block';
-        }
-
-        async function editClinic(id) {
-            currentEditId = id;
-            document.getElementById('modalTitle').textContent = '編輯診所';
-
-            try {
-                const response = await fetch(`/api/clinics?search=`);
-                const clinics = await response.json();
-                const clinic = clinics.find(c => c.id === id);
-
-                if (clinic) {
-                    document.getElementById('clinicId').value = clinic.id;
-                    document.getElementById('region').value = clinic.region || '';
-                    document.getElementById('district').value = clinic.district || '';
-                    document.getElementById('name').value = clinic.name || '';
-                    document.getElementById('healthMall').value = clinic.health_mall || '否';
-                    document.getElementById('hundredPosition').value = clinic.hundred_position || '否';
-                    document.getElementById('address').value = clinic.address || '';
-                    document.getElementById('phone').value = clinic.phone || '';
-                    document.getElementById('contactPerson').value = clinic.contact_person || '';
-                    document.getElementById('businessHours').value = clinic.business_hours || '';
-                    document.getElementById('note').value = clinic.note || '';
-
-                    const specialties = clinic.specialties ? clinic.specialties.split(',').map(s => s.trim()) : [];
-                    document.querySelectorAll('.checkbox-group input[type="checkbox"]:not(.media-item)').forEach(cb => {
-                        cb.checked = specialties.includes(cb.value);
-                    });
-
-                    const mediaItems = clinic.media_items ? clinic.media_items.split(',').map(m => m.trim()) : [];
-                    // 如果包含「全部」或「全選」，則選中所有項目
-                    const hasAll = mediaItems.includes('全部') || mediaItems.includes('全選');
-                    document.querySelectorAll('.media-item:not(#mediaAll)').forEach(cb => {
-                        cb.checked = hasAll || mediaItems.includes(cb.value);
-                    });
-                    // 如果所有項目都被選中，則選中「全選」
-                    if (hasAll) {
-                        document.getElementById('mediaAll').checked = true;
-                    }
-
-                    document.getElementById('clinicModal').style.display = 'block';
-                }
-            } catch (error) {
-                console.error('載入診所資料失敗:', error);
-                alert('載入診所資料失敗');
-            }
-        }
-
-        async function handleSubmit(e) {
-            e.preventDefault();
-
-            const selectedSpecialties = Array.from(
-                document.querySelectorAll('.checkbox-group input[type="checkbox"]:not(.media-item):checked')
-            ).map(cb => cb.value).join(',');
-
-            const selectedMediaItems = Array.from(
-                document.querySelectorAll('.media-item:checked')
-            )
-            .filter(cb => cb.value !== '全選') // 排除「全選」選項，不提交到資料庫
-            .map(cb => cb.value).join(',');
-
-            const clinicData = {
-                region: document.getElementById('region').value,
-                district: document.getElementById('district').value,
-                name: document.getElementById('name').value,
-                health_mall: document.getElementById('healthMall').value,
-                hundred_position: document.getElementById('hundredPosition').value,
-                media_items: selectedMediaItems,
-                specialties: selectedSpecialties,
-                address: document.getElementById('address').value,
-                phone: document.getElementById('phone').value,
-                contact_person: document.getElementById('contactPerson').value,
-                business_hours: document.getElementById('businessHours').value,
-                note: document.getElementById('note').value
-            };
-
-            try {
-                const id = document.getElementById('clinicId').value;
-                const url = id ? `/api/clinics/${id}` : '/api/clinics';
-                const method = id ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(clinicData)
-                });
-
-                if (response.ok) {
-                    closeModal();
-                    loadStats();
-                    loadClinics();
-                } else {
-                    const errorData = await response.json().catch(() => ({ error: '儲存失敗' }));
-                    console.error('儲存失敗:', errorData);
-                    alert(errorData.error || '儲存失敗');
-                }
-            } catch (error) {
-                console.error('儲存失敗:', error);
-                alert('儲存失敗，請稍後再試: ' + error.message);
-            }
-        }
-
-        async function deleteClinic(id) {
-            if (!confirm('確定要刪除這個診所嗎？')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/clinics/${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    loadStats();
-                    loadClinics();
-                } else {
-                    const error = await response.json();
-                    alert(error.error || '刪除失敗');
-                }
-            } catch (error) {
-                console.error('刪除失敗:', error);
-                alert('刪除失敗，請稍後再試');
-            }
-        }
-
-        function closeModal() {
-            document.getElementById('clinicModal').style.display = 'none';
-        }
-
-        function logout() {
-            window.location.href = '/logout';
-        }
-
-        window.onclick = function(event) {
-            const modal = document.getElementById('clinicModal');
-            if (event.target == modal) {
-                closeModal();
-            }
-            const importModal = document.getElementById('importModal');
-            if (event.target == importModal) {
-                closeImportModal();
-            }
-        }
-
-        // 匯出功能
-        function exportData() {
-            const search = document.getElementById('searchInput').value;
-            const region = document.getElementById('filterRegion').value;
-            const specialty = document.getElementById('filterSpecialty').value;
-            const mediaItem = document.getElementById('filterMediaItem') ? document.getElementById('filterMediaItem').value : '';
-            
-            const params = new URLSearchParams();
-            if (search) params.append('search', search);
-            if (region) params.append('region', region);
-            if (specialty) params.append('specialty', specialty);
-            if (mediaItem) params.append('media_item', mediaItem);
-            
-            // 產生下載連結
-            const url = `/api/export?${params}`;
-            window.location.href = url;
-        }
-
-        // 顯示匯入 Modal
-        function showImportModal() {
-            document.getElementById('importModal').style.display = 'block';
-            document.getElementById('importFile').value = '';
-            document.getElementById('importResult').style.display = 'none';
-        }
-
-        // 關閉匯入 Modal
-        function closeImportModal() {
-            document.getElementById('importModal').style.display = 'none';
-        }
-
-        // 上傳檔案
-        async function uploadFile() {
-            const fileInput = document.getElementById('importFile');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                alert('請選擇檔案');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            try {
-                const response = await fetch('/api/import', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                const resultDiv = document.getElementById('importResult');
-                
-                if (result.success) {
-                    resultDiv.innerHTML = `
-                        <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
-                            <strong>✅ 匯入成功</strong><br>
-                            成功匯入 ${result.imported} 筆資料
-                            ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
-                        </div>
-                    `;
-                    resultDiv.style.display = 'block';
-                    
-                    // 重新載入資料
-                    setTimeout(() => {
-                        closeImportModal();
-                        loadClinics();
-                        loadStats();
-                    }, 2000);
-                } else {
-                    resultDiv.innerHTML = `
-                        <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px;">
-                            <strong>❌ 匯入失敗</strong><br>
-                            ${result.error}
-                        </div>
-                    `;
-                    resultDiv.style.display = 'block';
-                }
-            } catch (error) {
-                alert('匯入失敗：' + error);
-            }
-        }
-        
-        // 顯示媒體項目下拉選單
-        async function showMediaDropdown(clinicId, event) {
-            event.stopPropagation();
-            
-            // 關閉其他已打開的下拉選單
-            document.querySelectorAll('.media-dropdown').forEach(dropdown => {
-                dropdown.classList.remove('active');
-            });
-            
-            // 找到對應的單元格
-            const cell = document.querySelector(`td.media-cell[data-clinic-id="${clinicId}"]`);
-            if (!cell) return;
-            
-            // 獲取當前診所的媒體項目
-            let currentMediaItems = [];
-            try {
-                const response = await fetch(`/api/clinics?search=`);
-                const clinics = await response.json();
-                const clinic = clinics.find(c => c.id === clinicId);
-                if (clinic && clinic.media_items) {
-                    currentMediaItems = clinic.media_items.split(',').map(m => m.trim());
-                }
-            } catch (error) {
-                console.error('載入診所資料失敗:', error);
-            }
-            
-            // 檢查是否已存在下拉選單
-            let dropdown = cell.querySelector('.media-dropdown');
-            if (dropdown) {
-                dropdown.remove(); // 移除舊的下拉選單以重新創建
-            }
-            
-            // 創建下拉選單
-            dropdown = document.createElement('div');
-            dropdown.className = 'media-dropdown';
-            const mediaOptions = ['藥袋', '海報', '櫃檯', '派樣'];
-            dropdown.innerHTML = mediaOptions.map(option => {
-                const checked = currentMediaItems.includes(option) ? 'checked' : '';
-                return `
-                    <div class="media-dropdown-item">
-                        <label><input type="checkbox" value="${option}" class="media-dropdown-checkbox" ${checked}> ${option}</label>
-                    </div>
-                `;
-            }).join('') + `
-                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
-                    <button onclick="saveMediaItems(${clinicId})" style="width: 100%; padding: 6px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">確定</button>
-                </div>
-            `;
-            cell.appendChild(dropdown);
-            
-            // 顯示下拉選單
-            dropdown.classList.add('active');
-            
-            // 設置位置
-            const rect = event.target.getBoundingClientRect();
-            dropdown.style.position = 'fixed';
-            dropdown.style.left = rect.left + 'px';
-            dropdown.style.top = (rect.bottom + 5) + 'px';
-            
-            // 點擊外部關閉
-            setTimeout(() => {
-                document.addEventListener('click', function closeDropdown(e) {
-                    if (!dropdown.contains(e.target) && e.target !== event.target && !event.target.closest('.media-empty')) {
-                        dropdown.classList.remove('active');
-                        document.removeEventListener('click', closeDropdown);
-                    }
-                });
-            }, 100);
-        }
-        
-        // 儲存媒體項目
-        async function saveMediaItems(clinicId) {
-            const cell = document.querySelector(`td.media-cell[data-clinic-id="${clinicId}"]`);
-            const dropdown = cell.querySelector('.media-dropdown');
-            const checkboxes = dropdown.querySelectorAll('.media-dropdown-checkbox:checked');
-            
-            const selectedItems = Array.from(checkboxes).map(cb => cb.value);
-            const mediaItems = selectedItems.join(',');
-            
-            try {
-                // 獲取當前診所資料
-                const response = await fetch(`/api/clinics?search=`);
-                const clinics = await response.json();
-                const clinic = clinics.find(c => c.id === clinicId);
-                
-                if (!clinic) {
-                    alert('找不到診所資料');
-                    return;
-                }
-                
-                // 更新媒體項目
-                const updateResponse = await fetch(`/api/clinics/${clinicId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        region: clinic.region,
-                        district: clinic.district,
-                        name: clinic.name,
-                        health_mall: clinic.health_mall || '否',
-                        hundred_position: clinic.hundred_position || '否',
-                        media_items: mediaItems,
-                        specialties: clinic.specialties,
-                        address: clinic.address,
-                        phone: clinic.phone,
-                        contact_person: clinic.contact_person,
-                        business_hours: clinic.business_hours,
-                        note: clinic.note
-                    })
-                });
-                
-                if (updateResponse.ok) {
-                    // 關閉下拉選單
-                    dropdown.classList.remove('active');
-                    
-                    // 重新載入資料
-                    loadClinics();
-                } else {
-                    const error = await updateResponse.json();
-                    alert(error.error || '更新失敗');
-                }
-            } catch (error) {
-                console.error('更新媒體項目失敗:', error);
-                alert('更新失敗，請稍後再試');
-            }
-        }
-        
-        // 切換健康醫購
-        async function toggleHealthMall(clinicId, event) {
-            event.stopPropagation();
-            
-            try {
-                const response = await fetch(`/api/clinics?search=`);
-                const clinics = await response.json();
-                const clinic = clinics.find(c => c.id === clinicId);
-                
-                if (!clinic) {
-                    alert('找不到診所資料');
-                    return;
-                }
-                
-                const newValue = clinic.health_mall === '是' ? '否' : '是';
-                
-                const updateResponse = await fetch(`/api/clinics/${clinicId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        region: clinic.region,
-                        district: clinic.district,
-                        name: clinic.name,
-                        health_mall: newValue,
-                        hundred_position: clinic.hundred_position || '否',
-                        media_items: clinic.media_items,
-                        specialties: clinic.specialties,
-                        address: clinic.address,
-                        phone: clinic.phone,
-                        contact_person: clinic.contact_person,
-                        business_hours: clinic.business_hours,
-                        note: clinic.note
-                    })
-                });
-                
-                if (updateResponse.ok) {
-                    loadStats();
-                    loadClinics();
-                } else {
-                    const error = await updateResponse.json();
-                    alert(error.error || '更新失敗');
-                }
-            } catch (error) {
-                console.error('更新健康醫購失敗:', error);
-                alert('更新失敗，請稍後再試');
-            }
-        }
-        
-        // 切換百位
-        async function toggleHundredPosition(clinicId, event) {
-            event.stopPropagation();
-            
-            try {
-                const response = await fetch(`/api/clinics?search=`);
-                const clinics = await response.json();
-                const clinic = clinics.find(c => c.id === clinicId);
-                
-                if (!clinic) {
-                    alert('找不到診所資料');
-                    return;
-                }
-                
-                const newValue = clinic.hundred_position === '是' ? '否' : '是';
-                
-                const updateResponse = await fetch(`/api/clinics/${clinicId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        region: clinic.region,
-                        district: clinic.district,
-                        name: clinic.name,
-                        health_mall: clinic.health_mall || '否',
-                        hundred_position: newValue,
-                        media_items: clinic.media_items,
-                        specialties: clinic.specialties,
-                        address: clinic.address,
-                        phone: clinic.phone,
-                        contact_person: clinic.contact_person,
-                        business_hours: clinic.business_hours,
-                        note: clinic.note
-                    })
-                });
-                
-                if (updateResponse.ok) {
-                    loadClinics();
-                } else {
-                    const error = await updateResponse.json();
-                    alert(error.error || '更新失敗');
-                }
-            } catch (error) {
-                console.error('更新百位失敗:', error);
-                alert('更新失敗，請稍後再試');
-            }
-        }
-    </script>
 
     <!-- 匯入 Modal -->
     <div class="modal" id="importModal">
@@ -1713,5 +833,436 @@
             <div id="importResult" style="margin-top: 20px; display: none;"></div>
         </div>
     </div>
+
+    <script>
+        let currentEditId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadClinics();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('filterRegion').addEventListener('change', applyFilters);
+            document.getElementById('filterSpecialty').addEventListener('change', applyFilters);
+            document.getElementById('filterColItem').addEventListener('change', applyFilters);
+            document.getElementById('searchInput').addEventListener('input', applyFilters);
+            document.getElementById('clinicForm').addEventListener('submit', handleSubmit);
+
+            // 全選功能
+            document.addEventListener('change', function(e) {
+                if (e.target.id === 'selectAll') {
+                    const checkboxes = document.querySelectorAll('.clinic-checkbox');
+                    checkboxes.forEach(cb => cb.checked = e.target.checked);
+                    updateDeleteButton();
+                } else if (e.target.classList.contains('clinic-checkbox')) {
+                    updateSelectAllState();
+                    updateDeleteButton();
+                }
+            });
+        }
+
+        function updateSelectAllState() {
+            const checkboxes = document.querySelectorAll('.clinic-checkbox');
+            const selectAll = document.getElementById('selectAll');
+            if (checkboxes.length === 0) {
+                if (selectAll) selectAll.checked = false;
+                return;
+            }
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+            if (selectAll) {
+                selectAll.checked = allChecked;
+                selectAll.indeterminate = someChecked && !allChecked;
+            }
+        }
+
+        function updateDeleteButton() {
+            const checkedBoxes = document.querySelectorAll('.clinic-checkbox:checked');
+            const deleteBtn = document.getElementById('btnDeleteBatch');
+            if (deleteBtn) {
+                deleteBtn.style.display = checkedBoxes.length > 0 ? 'inline-block' : 'none';
+            }
+        }
+
+        async function deleteSelected() {
+            const checkedBoxes = document.querySelectorAll('.clinic-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('請選擇要刪除的診所');
+                return;
+            }
+            const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute('data-clinic-id'));
+            const count = selectedIds.length;
+            if (!confirm(`確定要刪除選中的 ${count} 筆診所資料嗎？此操作無法復原。`)) return;
+
+            try {
+                const results = await Promise.all(
+                    selectedIds.map(id => fetch(`/api/clinics/${id}`, { method: 'DELETE' }))
+                );
+                const failed = results.filter(r => !r.ok);
+                if (failed.length > 0) {
+                    alert(`刪除完成，但有 ${failed.length} 筆資料刪除失敗`);
+                } else {
+                    alert(`成功刪除 ${count} 筆資料`);
+                }
+                loadStats();
+                loadClinics();
+                const selectAll = document.getElementById('selectAll');
+                if (selectAll) selectAll.checked = false;
+                updateDeleteButton();
+            } catch (error) {
+                console.error('批量刪除失敗:', error);
+                alert('批量刪除失敗，請稍後再試');
+            }
+        }
+
+        function getFilters() {
+            return {
+                search: document.getElementById('searchInput').value,
+                region: document.getElementById('filterRegion').value,
+                specialty: document.getElementById('filterSpecialty').value,
+                colItem: document.getElementById('filterColItem').value,
+            };
+        }
+
+        function buildParams(filters) {
+            const params = new URLSearchParams();
+            if (filters.search) params.append('search', filters.search);
+            if (filters.region) params.append('region', filters.region);
+            if (filters.specialty) params.append('specialty', filters.specialty);
+            if (filters.colItem) params.append('col_item', filters.colItem);
+            return params;
+        }
+
+        async function loadStats() {
+            try {
+                const filters = getFilters();
+                const params = buildParams(filters);
+                const response = await fetch(`/api/clinics?${params}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const clinics = await response.json();
+
+                document.getElementById('totalCount').textContent = clinics.length;
+
+                // 合作項目計數卡：選了才顯示數量
+                const colItemSelect = document.getElementById('filterColItem');
+                const colItemCard = document.getElementById('colItemStatCard');
+                const colItemLabel = document.getElementById('colItemStatLabel');
+                const colItemValue = document.getElementById('colItemStatValue');
+                const colItemNames = { yaodai: '藥袋', haibao: '海報/立牌', paiyang: '派樣', baiwei: '百位' };
+
+                if (filters.colItem) {
+                    colItemLabel.textContent = colItemNames[filters.colItem] || filters.colItem;
+                    colItemValue.textContent = clinics.length + ' 間';
+                    colItemCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    colItemCard.style.color = 'white';
+                } else {
+                    colItemLabel.textContent = '合作項目';
+                    colItemValue.textContent = '-';
+                    colItemCard.style.background = 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
+                    colItemCard.style.color = '#333';
+                }
+
+                // 科別計數卡：選了才顯示數量
+                const specialtyCard = document.getElementById('specialtyStatCard');
+                const specialtyLabel = document.getElementById('specialtyStatLabel');
+                const specialtyValue = document.getElementById('specialtyStatValue');
+
+                if (filters.specialty) {
+                    specialtyLabel.textContent = filters.specialty;
+                    specialtyValue.textContent = clinics.length + ' 間';
+                    specialtyCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    specialtyCard.style.color = 'white';
+                } else {
+                    specialtyLabel.textContent = '科別';
+                    specialtyValue.textContent = '-';
+                    specialtyCard.style.background = 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
+                    specialtyCard.style.color = '#333';
+                }
+            } catch (error) {
+                console.error('載入統計失敗:', error);
+            }
+        }
+
+        function applyFilters() {
+            loadClinics();
+            loadStats();
+        }
+
+        async function loadClinics() {
+            try {
+                const filters = getFilters();
+                const params = buildParams(filters);
+                const response = await fetch(`/api/clinics?${params}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const clinics = await response.json();
+
+                const tbody = document.getElementById('clinicsTable');
+                tbody.innerHTML = '';
+
+                if (clinics.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">沒有符合條件的診所</td></tr>';
+                    return;
+                }
+
+                clinics.forEach((clinic, index) => {
+                    // 科別標籤
+                    const specialties = clinic.specialties
+                        ? clinic.specialties.split(',').map(s => `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
+                        : '';
+
+                    // 合作項目標籤
+                    const colTags = [];
+                    if (clinic.col_yaodai)  colTags.push('<span class="col-tag yaodai">藥袋</span>');
+                    if (clinic.col_haibao)  colTags.push('<span class="col-tag haibao">海報/立牌</span>');
+                    if (clinic.col_paiyang) colTags.push('<span class="col-tag paiyang">派樣</span>');
+                    if (clinic.col_baiwei)  colTags.push('<span class="col-tag baiwei">百位</span>');
+                    const colItemsDisplay = colTags.length > 0 ? colTags.join(' ') : '<span style="color:#ccc;">-</span>';
+
+                    const row = document.createElement('tr');
+                    row.setAttribute('data-clinic-id', clinic.id);
+                    row.innerHTML = `
+                        <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${clinic.id}"></td>
+                        <td>${index + 1}</td>
+                        <td>${clinic.region || ''}</td>
+                        <td>${clinic.district || ''}</td>
+                        <td title="${clinic.name}">${clinic.name}</td>
+                        <td>${specialties}</td>
+                        <td>${clinic.phone || ''}</td>
+                        <td>${clinic.contact_person || ''}</td>
+                        <td>${colItemsDisplay}</td>
+                        <td>
+                            <button class="btn-edit" onclick="editClinic(${clinic.id})">編輯</button>
+                            <button class="btn-detail" onclick="toggleDetail(${clinic.id})">詳細</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+
+                    // 詳細資訊列
+                    const detailRow = document.createElement('tr');
+                    detailRow.className = 'detail-row';
+                    detailRow.setAttribute('data-detail-for', clinic.id);
+                    detailRow.innerHTML = `
+                        <td colspan="10">
+                            <div class="detail-content">
+                                <h4>詳細資訊</h4>
+                                <div class="detail-info">
+                                    <div class="detail-item">
+                                        <label>地址</label>
+                                        <span>${clinic.address || '未設定'}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <label>營業時間</label>
+                                        <span>${clinic.business_hours || '未設定'}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <label>備註</label>
+                                        <span>${clinic.note || '無備註'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(detailRow);
+                });
+
+                updateSelectAllState();
+            } catch (error) {
+                console.error('載入診所失敗:', error);
+                alert('載入資料失敗: ' + error.message);
+            }
+        }
+
+        function toggleDetail(clinicId) {
+            const detailRow = document.querySelector(`tr[data-detail-for="${clinicId}"]`);
+            if (!detailRow) return;
+            document.querySelectorAll('.detail-row.active').forEach(row => {
+                if (row !== detailRow) row.classList.remove('active');
+            });
+            detailRow.classList.toggle('active');
+        }
+
+        function showAddModal() {
+            currentEditId = null;
+            document.getElementById('modalTitle').textContent = '新增診所';
+            document.getElementById('clinicForm').reset();
+            document.getElementById('clinicId').value = '';
+            document.getElementById('clinicModal').style.display = 'block';
+        }
+
+        async function editClinic(id) {
+            currentEditId = id;
+            document.getElementById('modalTitle').textContent = '編輯診所';
+
+            try {
+                const response = await fetch('/api/clinics');
+                const clinics = await response.json();
+                const clinic = clinics.find(c => c.id === id);
+
+                if (clinic) {
+                    document.getElementById('clinicId').value = clinic.id;
+                    document.getElementById('region').value = clinic.region || '';
+                    document.getElementById('district').value = clinic.district || '';
+                    document.getElementById('name').value = clinic.name || '';
+                    document.getElementById('address').value = clinic.address || '';
+                    document.getElementById('phone').value = clinic.phone || '';
+                    document.getElementById('contactPerson').value = clinic.contact_person || '';
+                    document.getElementById('businessHours').value = clinic.business_hours || '';
+                    document.getElementById('note').value = clinic.note || '';
+
+                    // 科別勾選
+                    const specialties = clinic.specialties ? clinic.specialties.split(',').map(s => s.trim()) : [];
+                    document.querySelectorAll('#specialtyGroup input[type="checkbox"]').forEach(cb => {
+                        cb.checked = specialties.includes(cb.value);
+                    });
+
+                    // 合作項目勾選
+                    document.getElementById('colYaodai').checked = clinic.col_yaodai || false;
+                    document.getElementById('colHaibao').checked = clinic.col_haibao || false;
+                    document.getElementById('colPaiyang').checked = clinic.col_paiyang || false;
+                    document.getElementById('colBaiwei').checked = clinic.col_baiwei || false;
+
+                    document.getElementById('clinicModal').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('載入診所資料失敗:', error);
+                alert('載入診所資料失敗');
+            }
+        }
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+
+            const selectedSpecialties = Array.from(
+                document.querySelectorAll('#specialtyGroup input[type="checkbox"]:checked')
+            ).map(cb => cb.value).join(',');
+
+            const clinicData = {
+                region: document.getElementById('region').value,
+                district: document.getElementById('district').value,
+                name: document.getElementById('name').value,
+                col_yaodai: document.getElementById('colYaodai').checked,
+                col_haibao: document.getElementById('colHaibao').checked,
+                col_paiyang: document.getElementById('colPaiyang').checked,
+                col_baiwei: document.getElementById('colBaiwei').checked,
+                specialties: selectedSpecialties,
+                address: document.getElementById('address').value,
+                phone: document.getElementById('phone').value,
+                contact_person: document.getElementById('contactPerson').value,
+                business_hours: document.getElementById('businessHours').value,
+                note: document.getElementById('note').value
+            };
+
+            try {
+                const id = document.getElementById('clinicId').value;
+                const url = id ? `/api/clinics/${id}` : '/api/clinics';
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(clinicData)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadStats();
+                    loadClinics();
+                } else {
+                    const errorData = await response.json().catch(() => ({ error: '儲存失敗' }));
+                    alert(errorData.error || '儲存失敗');
+                }
+            } catch (error) {
+                console.error('儲存失敗:', error);
+                alert('儲存失敗，請稍後再試: ' + error.message);
+            }
+        }
+
+        async function deleteClinic(id) {
+            if (!confirm('確定要刪除這個診所嗎？')) return;
+
+            try {
+                const response = await fetch(`/api/clinics/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadStats();
+                    loadClinics();
+                } else {
+                    const error = await response.json();
+                    alert(error.error || '刪除失敗');
+                }
+            } catch (error) {
+                console.error('刪除失敗:', error);
+                alert('刪除失敗，請稍後再試');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('clinicModal').style.display = 'none';
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('clinicModal');
+            if (event.target == modal) closeModal();
+            const importModal = document.getElementById('importModal');
+            if (event.target == importModal) closeImportModal();
+        };
+
+        function exportData() {
+            const filters = getFilters();
+            const params = buildParams(filters);
+            window.location.href = `/api/export?${params}`;
+        }
+
+        function showImportModal() {
+            document.getElementById('importModal').style.display = 'block';
+            document.getElementById('importFile').value = '';
+            document.getElementById('importResult').style.display = 'none';
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').style.display = 'none';
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput.files[0];
+            if (!file) { alert('請選擇檔案'); return; }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/import', { method: 'POST', body: formData });
+                const result = await response.json();
+                const resultDiv = document.getElementById('importResult');
+
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
+                            <strong>✅ 匯入成功</strong><br>
+                            成功匯入 ${result.imported} 筆資料
+                            ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                    setTimeout(() => { closeImportModal(); loadClinics(); loadStats(); }, 2000);
+                } else {
+                    resultDiv.innerHTML = `
+                        <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px;">
+                            <strong>❌ 匯入失敗</strong><br>${result.error}
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                alert('匯入失敗：' + error);
+            }
+        }
+    </script>
 </body>
 </html>

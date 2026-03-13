@@ -23,18 +23,22 @@ db = SQLAlchemy(app)
 # 診所資料模型
 class Clinic(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    region = db.Column(db.String(50))  # 縣市
-    district = db.Column(db.String(50))  # 區域
-    name = db.Column(db.String(200))  # 診所名稱
-    health_mall = db.Column(db.String(10), default='否')  # 健康醫購
-    hundred_position = db.Column(db.String(10), default='否')  # 百位
-    media_items = db.Column(db.String(500))  # 媒體項目
-    specialties = db.Column(db.String(500))  # 科別
-    address = db.Column(db.String(300))  # 地址
-    phone = db.Column(db.String(50))  # 電話
+    region = db.Column(db.String(50))           # 縣市
+    district = db.Column(db.String(50))         # 區域
+    name = db.Column(db.String(200))            # 診所名稱
+    health_mall = db.Column(db.String(10), default='否')        # 保留舊欄位（不對外暴露）
+    hundred_position = db.Column(db.String(10), default='否')   # 保留舊欄位（不對外暴露）
+    media_items = db.Column(db.String(500))     # 保留舊欄位（供匯出用）
+    specialties = db.Column(db.String(500))     # 科別
+    address = db.Column(db.String(300))         # 地址
+    phone = db.Column(db.String(50))            # 電話
     contact_person = db.Column(db.String(100))  # 負責人
     business_hours = db.Column(db.String(200))  # 營業時間
-    note = db.Column(db.Text)  # 備註
+    note = db.Column(db.Text)                   # 備註
+    col_yaodai = db.Column(db.Boolean, default=False)   # 藥袋
+    col_haibao = db.Column(db.Boolean, default=False)   # 海報/立牌
+    col_paiyang = db.Column(db.Boolean, default=False)  # 派樣
+    col_baiwei = db.Column(db.Boolean, default=False)   # 百位
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -57,7 +61,7 @@ def login():
         data = request.get_json()
         username = data.get('username')
         password = data.get('password')
-        
+
         if username == 'admin' and password == 'Bcm13011579!@':
             session['user'] = 'admin'
             session['role'] = 'admin'
@@ -68,7 +72,7 @@ def login():
             return jsonify({'success': True})
         else:
             return jsonify({'error': '帳號或密碼錯誤'}), 401
-    
+
     return render_template('login.html')
 
 @app.route('/logout')
@@ -82,31 +86,42 @@ def get_clinics():
     search = request.args.get('search', '')
     region = request.args.get('region', '')
     specialty = request.args.get('specialty', '')
-    
+    col_item = request.args.get('col_item', '')  # yaodai / haibao / paiyang / baiwei
+
     query = Clinic.query
-    
+
     if search:
         query = query.filter(
             (Clinic.name.contains(search)) |
             (Clinic.contact_person.contains(search))
         )
-    
+
     if region:
         query = query.filter(Clinic.region == region)
-    
+
     if specialty:
         query = query.filter(Clinic.specialties.contains(specialty))
-    
+
+    if col_item == 'yaodai':
+        query = query.filter(Clinic.col_yaodai == True)
+    elif col_item == 'haibao':
+        query = query.filter(Clinic.col_haibao == True)
+    elif col_item == 'paiyang':
+        query = query.filter(Clinic.col_paiyang == True)
+    elif col_item == 'baiwei':
+        query = query.filter(Clinic.col_baiwei == True)
+
     clinics = query.all()
-    
+
     return jsonify([{
         'id': c.id,
         'region': c.region,
         'district': c.district,
         'name': c.name,
-        'health_mall': c.health_mall or '否',
-        'hundred_position': c.hundred_position or '否',
-        'media_items': c.media_items,
+        'col_yaodai': c.col_yaodai or False,
+        'col_haibao': c.col_haibao or False,
+        'col_paiyang': c.col_paiyang or False,
+        'col_baiwei': c.col_baiwei or False,
         'specialties': c.specialties,
         'address': c.address,
         'phone': c.phone,
@@ -120,17 +135,18 @@ def get_clinics():
 def create_clinic():
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    
+
     try:
         data = request.get_json()
-        
+
         clinic = Clinic(
             region=data.get('region'),
             district=data.get('district'),
             name=data.get('name'),
-            health_mall=data.get('health_mall', '否'),
-            hundred_position=data.get('hundred_position', '否'),
-            media_items=data.get('media_items'),
+            col_yaodai=data.get('col_yaodai', False),
+            col_haibao=data.get('col_haibao', False),
+            col_paiyang=data.get('col_paiyang', False),
+            col_baiwei=data.get('col_baiwei', False),
             specialties=data.get('specialties'),
             address=data.get('address'),
             phone=data.get('phone'),
@@ -138,10 +154,10 @@ def create_clinic():
             business_hours=data.get('business_hours'),
             note=data.get('note')
         )
-        
+
         db.session.add(clinic)
         db.session.commit()
-        
+
         return jsonify({'success': True, 'id': clinic.id})
     except Exception as e:
         db.session.rollback()
@@ -151,26 +167,27 @@ def create_clinic():
 def update_clinic(clinic_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    
+
     try:
         clinic = Clinic.query.get_or_404(clinic_id)
         data = request.get_json()
-        
+
         clinic.region = data.get('region')
         clinic.district = data.get('district')
         clinic.name = data.get('name')
-        clinic.health_mall = data.get('health_mall', '否')
-        clinic.hundred_position = data.get('hundred_position', '否')
-        clinic.media_items = data.get('media_items')
+        clinic.col_yaodai = data.get('col_yaodai', False)
+        clinic.col_haibao = data.get('col_haibao', False)
+        clinic.col_paiyang = data.get('col_paiyang', False)
+        clinic.col_baiwei = data.get('col_baiwei', False)
         clinic.specialties = data.get('specialties')
         clinic.address = data.get('address')
         clinic.phone = data.get('phone')
         clinic.contact_person = data.get('contact_person')
         clinic.business_hours = data.get('business_hours')
         clinic.note = data.get('note')
-        
+
         db.session.commit()
-        
+
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
@@ -180,32 +197,24 @@ def update_clinic(clinic_id):
 def delete_clinic(clinic_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    
+
     clinic = Clinic.query.get_or_404(clinic_id)
     db.session.delete(clinic)
     db.session.commit()
-    
+
     return jsonify({'success': True})
 
 @app.route('/api/stats')
 def get_stats():
     total = Clinic.query.count()
-    
-    # 計算有媒體項目的診所數量
-    media_clinics = Clinic.query.filter(Clinic.media_items != None, Clinic.media_items != '').count()
-    
-    return jsonify({
-        'total': total,
-        'media_clinics': media_clinics,
-        'no_media_clinics': total - media_clinics
-    })
+    return jsonify({'total': total})
 
 @app.route('/api/analytics/regions')
 def get_region_stats():
     """各縣市診所數量統計"""
     clinics = Clinic.query.all()
     region_count = Counter(c.region for c in clinics if c.region)
-    
+
     return jsonify({
         'regions': list(region_count.keys()),
         'counts': list(region_count.values())
@@ -216,14 +225,14 @@ def get_specialty_stats():
     """科別統計（處理複選）"""
     clinics = Clinic.query.all()
     specialty_list = []
-    
+
     for clinic in clinics:
         if clinic.specialties:
             specs = [s.strip() for s in clinic.specialties.split(',')]
             specialty_list.extend(specs)
-    
+
     specialty_count = Counter(specialty_list)
-    
+
     return jsonify({
         'specialties': list(specialty_count.keys()),
         'counts': list(specialty_count.values())
@@ -234,15 +243,14 @@ def get_taiwan_map_data():
     """台灣地圖資料（縣市對應）"""
     clinics = Clinic.query.all()
     region_count = Counter(c.region for c in clinics if c.region)
-    
-    # ECharts 台灣地圖的縣市名稱對應
+
     map_data = []
     for region, count in region_count.items():
         map_data.append({
             'name': region,
             'value': count
         })
-    
+
     return jsonify(map_data)
 
 # 匯出路由
@@ -252,38 +260,41 @@ def export_data():
     search = request.args.get('search', '')
     region = request.args.get('region', '')
     specialty = request.args.get('specialty', '')
-    media_item = request.args.get('media_item', '')
-    
+    col_item = request.args.get('col_item', '')
+
     query = Clinic.query
-    
-    # 套用篩選條件（與列表頁相同的邏輯）
+
     if search:
         query = query.filter(
             (Clinic.name.contains(search)) |
             (Clinic.address.contains(search)) |
             (Clinic.contact_person.contains(search))
         )
-    
+
     if region:
         query = query.filter(Clinic.region == region)
-    
+
     if specialty:
         query = query.filter(Clinic.specialties.contains(specialty))
-    
-    if media_item:
-        query = query.filter(Clinic.media_items.contains(media_item))
-    
+
+    if col_item == 'yaodai':
+        query = query.filter(Clinic.col_yaodai == True)
+    elif col_item == 'haibao':
+        query = query.filter(Clinic.col_haibao == True)
+    elif col_item == 'paiyang':
+        query = query.filter(Clinic.col_paiyang == True)
+    elif col_item == 'baiwei':
+        query = query.filter(Clinic.col_baiwei == True)
+
     clinics = query.all()
-    
+
     if not clinics:
         return jsonify({'error': '沒有符合條件的資料'}), 400
-    
-    # 產生 Excel
+
     output = export_clinics(clinics)
-    
-    # 產生檔名
+
     filename = f'診所清單_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-    
+
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -297,30 +308,27 @@ def import_data():
     """匯入診所資料"""
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    
+
     if 'file' not in request.files:
         return jsonify({'error': '沒有上傳檔案'}), 400
-    
+
     file = request.files['file']
-    
+
     if file.filename == '':
         return jsonify({'error': '沒有選擇檔案'}), 400
-    
+
     if not file.filename.endswith('.xlsx'):
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
-    
-    # 儲存暫存檔案
+
     filename = secure_filename(file.filename)
     temp_path = os.path.join('/tmp', filename)
     file.save(temp_path)
-    
-    # 匯入資料
+
     with app.app_context():
         result = import_clinics(temp_path, db, Clinic)
-    
-    # 刪除暫存檔案
+
     os.remove(temp_path)
-    
+
     return jsonify(result)
 
 if __name__ == '__main__':
