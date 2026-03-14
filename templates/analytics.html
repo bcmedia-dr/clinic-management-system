@@ -95,6 +95,15 @@
             height: 280px; color: #999; font-size: 14px;
         }
 
+        .stat-select {
+            width: 100%; margin: 6px 0 8px;
+            padding: 5px 8px; border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.2); color: white;
+            font-size: 13px; font-family: 'Noto Sans TC', sans-serif; cursor: pointer;
+        }
+        .stat-select option { color: #333; background: white; }
+
         @media (max-width: 900px) {
             .stats-row { grid-template-columns: repeat(2, 1fr); }
             .charts-grid { grid-template-columns: 1fr; }
@@ -135,9 +144,15 @@
                 <div class="stat-value" id="kHmTotal">—</div>
             </div>
             <div class="stat-card c3">
-                <div class="stat-icon">✅</div>
-                <div class="stat-label">健康醫購合作中</div>
-                <div class="stat-value" id="kHmActive">—</div>
+                <div class="stat-icon">🏷️</div>
+                <div class="stat-label" id="hmStatusLabel">合作狀態</div>
+                <select class="stat-select" id="hmStatusSelect" onchange="onHmStatusChange()">
+                    <option value="">請選擇狀態</option>
+                    <option value="合作中">合作中</option>
+                    <option value="暫停">暫停</option>
+                    <option value="結束">結束</option>
+                </select>
+                <div class="stat-value" id="kHmStatus">—</div>
             </div>
             <div class="stat-card c4">
                 <div class="stat-icon">📍</div>
@@ -212,6 +227,9 @@
         Chart.defaults.font.size = 13;
         Chart.defaults.color = '#555';
 
+        let _hmStatusData = {};   // 儲存 hm_status 供選取器使用
+        let _chartHmStatus = null;
+
         const COLORS = [
             '#667eea','#764ba2','#f093fb','#f5576c','#4facfe',
             '#00f2fe','#43e97b','#38f9d7','#fa709a','#fee140',
@@ -227,9 +245,11 @@
                 // ── 數字卡片 ──
                 document.getElementById('kTotal').textContent      = d.total;
                 document.getElementById('kHmTotal').textContent    = d.hm_total;
-                document.getElementById('kHmActive').textContent   = d.hm_active;
                 document.getElementById('kTopRegion').textContent  = d.top_region;
                 document.getElementById('kTopRegionCount').textContent = d.top_region_count + ' 間';
+
+                // 儲存合作狀態資料供選取器使用
+                _hmStatusData = d.hm_status;
 
                 // ── 1. 各縣市診所數（長條圖） ──
                 const regionLabels = Object.keys(d.regions);
@@ -314,11 +334,11 @@
                 });
 
                 // ── 4. 健康醫購合作狀態（圓餅圖） ──
-                const hmStatusLabels = Object.keys(d.hm_status);
-                const hmStatusData   = Object.values(d.hm_status);
-                const hmStatusColors = ['#d4edda', '#fff3cd', '#f8d7da'];
+                const hmStatusLabels  = Object.keys(d.hm_status);
+                const hmStatusData    = Object.values(d.hm_status);
+                const hmStatusColors  = ['#d4edda', '#fff3cd', '#f8d7da'];
                 const hmStatusBorders = ['#155724', '#856404', '#721c24'];
-                new Chart(document.getElementById('chartHmStatus'), {
+                _chartHmStatus = new Chart(document.getElementById('chartHmStatus'), {
                     type: 'doughnut',
                     data: {
                         labels: hmStatusLabels,
@@ -379,6 +399,30 @@
                 document.querySelector('.container').innerHTML +=
                     `<div style="color:red;padding:20px;">載入統計資料失敗：${err.message}</div>`;
             }
+        }
+
+        function onHmStatusChange() {
+            const status = document.getElementById('hmStatusSelect').value;
+            const label  = document.getElementById('hmStatusLabel');
+            const value  = document.getElementById('kHmStatus');
+
+            if (status) {
+                label.textContent = status;
+                value.textContent = (_hmStatusData[status] ?? 0) + ' 間';
+            } else {
+                label.textContent = '合作狀態';
+                value.textContent = '—';
+            }
+
+            // 更新圓餅圖：選取狀態時該 slice 加深，其餘變淡
+            if (!_chartHmStatus) return;
+            const allLabels = ['合作中', '暫停', '結束'];
+            const allColors  = ['#d4edda', '#fff3cd', '#f8d7da'];
+            const dimColors  = ['#d4edda55', '#fff3cd55', '#f8d7da55'];
+            _chartHmStatus.data.datasets[0].backgroundColor = allLabels.map((l, i) =>
+                !status || l === status ? allColors[i] : dimColors[i]
+            );
+            _chartHmStatus.update();
         }
 
         loadAndRender();

@@ -255,13 +255,13 @@
         <div class="stats-container">
             <div class="stat-card total">
                 <div class="stat-icon">🏪</div>
-                <div class="stat-label">健康醫購診所總數</div>
+                <div class="stat-label">診所總數</div>
                 <div class="stat-value" id="totalCount">0</div>
             </div>
-            <div class="stat-card active-card">
-                <div class="stat-icon">✅</div>
-                <div class="stat-label">合作中</div>
-                <div class="stat-value" id="activeCount">0</div>
+            <div class="stat-card active-card" id="statusStatCard">
+                <div class="stat-icon">🏷️</div>
+                <div class="stat-label" id="statusStatLabel">合作狀態</div>
+                <div class="stat-value" id="statusStatValue">-</div>
             </div>
             <div class="stat-card" id="specialtyStatCard" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
                 <div class="stat-icon">🏷️</div>
@@ -527,8 +527,22 @@
 
                 // 總數：以當前篩選結果為準
                 document.getElementById('totalCount').textContent = clinics.length;
-                // 合作中：整體數字（不受篩選影響）
-                document.getElementById('activeCount').textContent = stats.active;
+
+                // 合作狀態計數卡
+                const statusCard  = document.getElementById('statusStatCard');
+                const statusLabel = document.getElementById('statusStatLabel');
+                const statusValue = document.getElementById('statusStatValue');
+                if (f.status) {
+                    statusLabel.textContent = f.status;
+                    statusValue.textContent = clinics.length + ' 間';
+                    statusCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    statusCard.style.color = 'white';
+                } else {
+                    statusLabel.textContent = '合作狀態';
+                    statusValue.textContent = '-';
+                    statusCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    statusCard.style.color = 'white';
+                }
 
                 // 科別計數卡
                 const specCard  = document.getElementById('specialtyStatCard');
