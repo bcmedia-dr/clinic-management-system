@@ -5,6 +5,7 @@ import os, re
 from collections import Counter
 from io import BytesIO
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 from werkzeug.utils import secure_filename
 from export import export_clinics
 from import_data import import_clinics
@@ -22,30 +23,49 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# 診所資料模型
+
+# ── 資料模型 ─────────────────────────────────────────────────
+
 class Clinic(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    region = db.Column(db.String(50))
-    district = db.Column(db.String(50))
-    name = db.Column(db.String(200))
-    health_mall = db.Column(db.String(10), default='否')        # 保留舊欄位
-    hundred_position = db.Column(db.String(10), default='否')   # 保留舊欄位
-    media_items = db.Column(db.String(500))                     # 保留舊欄位（供匯出用）
-    specialties = db.Column(db.String(500))
-    address = db.Column(db.String(300))
-    phone = db.Column(db.String(50))
+    id             = db.Column(db.Integer, primary_key=True)
+    region         = db.Column(db.String(50))
+    district       = db.Column(db.String(50))
+    name           = db.Column(db.String(200))
+    health_mall    = db.Column(db.String(10), default='否')       # 舊欄位（保留）
+    hundred_position = db.Column(db.String(10), default='否')     # 舊欄位（保留）
+    media_items    = db.Column(db.String(500))                    # 舊欄位（保留）
+    specialties    = db.Column(db.String(500))
+    address        = db.Column(db.String(300))
+    phone          = db.Column(db.String(50))
     contact_person = db.Column(db.String(100))
     business_hours = db.Column(db.String(200))
-    note = db.Column(db.Text)
-    col_yaodai = db.Column(db.Boolean, default=False)
-    col_haibao = db.Column(db.Boolean, default=False)
-    col_paiyang = db.Column(db.Boolean, default=False)
-    col_baiwei = db.Column(db.Boolean, default=False)
-    health_mall_status = db.Column(db.String(20), default='否')     # 合作中/暫停/結束/否
-    health_mall_start_date = db.Column(db.Date)
-    health_mall_note = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    note           = db.Column(db.Text)
+    col_yaodai     = db.Column(db.Boolean, default=False)
+    col_haibao     = db.Column(db.Boolean, default=False)
+    col_paiyang    = db.Column(db.Boolean, default=False)
+    col_baiwei     = db.Column(db.Boolean, default=False)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at     = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class HealthMall(db.Model):
+    __tablename__ = 'health_mall'
+    id             = db.Column(db.Integer, primary_key=True)
+    clinic_id      = db.Column(db.Integer, db.ForeignKey('clinic.id'), nullable=True)
+    region         = db.Column(db.String(50))
+    district       = db.Column(db.String(50))
+    name           = db.Column(db.String(200))
+    phone          = db.Column(db.String(50))
+    contact_person = db.Column(db.String(100))
+    specialties    = db.Column(db.String(500))
+    address        = db.Column(db.String(300))
+    status         = db.Column(db.String(20), default='合作中')
+    start_date     = db.Column(db.Date)
+    note           = db.Column(db.Text)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at     = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    clinic = db.relationship('Clinic', backref=db.backref('health_mall_records', lazy=True))
 
 
 # ── 頁面路由 ────────────────────────────────────────────────
@@ -102,10 +122,10 @@ def logout():
 
 @app.route('/api/clinics', methods=['GET'])
 def get_clinics():
-    search   = request.args.get('search', '')
-    region   = request.args.get('region', '')
+    search    = request.args.get('search', '')
+    region    = request.args.get('region', '')
     specialty = request.args.get('specialty', '')
-    col_item = request.args.get('col_item', '')
+    col_item  = request.args.get('col_item', '')
 
     query = Clinic.query
 
@@ -129,21 +149,21 @@ def get_clinics():
 
     clinics = query.all()
     return jsonify([{
-        'id': c.id,
-        'region': c.region,
-        'district': c.district,
-        'name': c.name,
-        'col_yaodai': c.col_yaodai or False,
-        'col_haibao': c.col_haibao or False,
-        'col_paiyang': c.col_paiyang or False,
-        'col_baiwei': c.col_baiwei or False,
-        'specialties': c.specialties,
-        'address': c.address,
-        'phone': c.phone,
+        'id':             c.id,
+        'region':         c.region,
+        'district':       c.district,
+        'name':           c.name,
+        'col_yaodai':     c.col_yaodai or False,
+        'col_haibao':     c.col_haibao or False,
+        'col_paiyang':    c.col_paiyang or False,
+        'col_baiwei':     c.col_baiwei or False,
+        'specialties':    c.specialties,
+        'address':        c.address,
+        'phone':          c.phone,
         'contact_person': c.contact_person,
         'business_hours': c.business_hours,
-        'note': c.note,
-        'created_at': c.created_at.strftime('%Y-%m-%d %H:%M:%S') if c.created_at else None
+        'note':           c.note,
+        'created_at':     c.created_at.strftime('%Y-%m-%d %H:%M:%S') if c.created_at else None
     } for c in clinics])
 
 @app.route('/api/clinics', methods=['POST'])
@@ -181,19 +201,19 @@ def update_clinic(clinic_id):
     try:
         clinic = Clinic.query.get_or_404(clinic_id)
         data = request.get_json()
-        clinic.region = data.get('region')
-        clinic.district = data.get('district')
-        clinic.name = data.get('name')
-        clinic.col_yaodai = data.get('col_yaodai', False)
-        clinic.col_haibao = data.get('col_haibao', False)
-        clinic.col_paiyang = data.get('col_paiyang', False)
-        clinic.col_baiwei = data.get('col_baiwei', False)
-        clinic.specialties = data.get('specialties')
-        clinic.address = data.get('address')
-        clinic.phone = data.get('phone')
+        clinic.region         = data.get('region')
+        clinic.district       = data.get('district')
+        clinic.name           = data.get('name')
+        clinic.col_yaodai     = data.get('col_yaodai', False)
+        clinic.col_haibao     = data.get('col_haibao', False)
+        clinic.col_paiyang    = data.get('col_paiyang', False)
+        clinic.col_baiwei     = data.get('col_baiwei', False)
+        clinic.specialties    = data.get('specialties')
+        clinic.address        = data.get('address')
+        clinic.phone          = data.get('phone')
         clinic.contact_person = data.get('contact_person')
         clinic.business_hours = data.get('business_hours')
-        clinic.note = data.get('note')
+        clinic.note           = data.get('note')
         db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
@@ -214,10 +234,29 @@ def get_stats():
     total = Clinic.query.count()
     return jsonify({'total': total})
 
+@app.route('/api/clinics/search')
+def search_clinics_for_hm():
+    """供健康醫購新增時，從診所總表搜尋帶入資料"""
+    q = request.args.get('q', '').strip()
+    query = Clinic.query
+    if q:
+        query = query.filter(
+            Clinic.name.contains(q) | Clinic.phone.contains(q)
+        )
+    clinics = query.order_by(Clinic.name).limit(30).all()
+    return jsonify([{
+        'id':             c.id,
+        'region':         c.region or '',
+        'district':       c.district or '',
+        'name':           c.name or '',
+        'phone':          c.phone or '',
+        'contact_person': c.contact_person or '',
+        'specialties':    c.specialties or '',
+        'address':        c.address or '',
+    } for c in clinics])
+
 
 # ── 健康醫購 API ─────────────────────────────────────────────
-
-HM_STATUSES = ('合作中', '暫停', '結束')
 
 @app.route('/api/health-mall', methods=['GET'])
 def get_health_mall():
@@ -226,27 +265,27 @@ def get_health_mall():
     specialty = request.args.get('specialty', '')
     status    = request.args.get('status', '')
 
-    query = Clinic.query.filter(Clinic.health_mall_status.in_(HM_STATUSES))
+    query = HealthMall.query
 
     if search:
         query = query.filter(
-            (Clinic.name.contains(search)) |
-            (Clinic.contact_person.contains(search))
+            HealthMall.name.contains(search) |
+            HealthMall.contact_person.contains(search)
         )
     if region:
-        query = query.filter(Clinic.region == region)
+        query = query.filter(HealthMall.region == region)
     if specialty:
-        query = query.filter(Clinic.specialties.contains(specialty))
+        query = query.filter(HealthMall.specialties.contains(specialty))
     if status:
-        query = query.filter(Clinic.health_mall_status == status)
+        query = query.filter(HealthMall.status == status)
 
-    clinics = query.all()
-    return jsonify([_hm_json(c) for c in clinics])
+    items = query.all()
+    return jsonify([_hm_json(h) for h in items])
 
 @app.route('/api/health-mall/stats')
 def get_health_mall_stats():
-    total  = Clinic.query.filter(Clinic.health_mall_status.in_(HM_STATUSES)).count()
-    active = Clinic.query.filter(Clinic.health_mall_status == '合作中').count()
+    total  = HealthMall.query.count()
+    active = HealthMall.query.filter(HealthMall.status == '合作中').count()
     return jsonify({'total': total, 'active': active})
 
 @app.route('/api/health-mall', methods=['POST'])
@@ -255,54 +294,59 @@ def create_health_mall():
         return jsonify({'error': '權限不足'}), 403
     try:
         data = request.get_json()
-        clinic = Clinic(
-            region=data.get('region'),
-            district=data.get('district'),
-            name=data.get('name'),
-            specialties=data.get('specialties'),
-            address=data.get('address'),
-            phone=data.get('phone'),
-            contact_person=data.get('contact_person'),
-            health_mall_status=data.get('health_mall_status', '合作中'),
-            health_mall_start_date=_parse_date(data.get('health_mall_start_date')),
-            health_mall_note=data.get('health_mall_note'),
+        clinic_id_raw = data.get('clinic_id')
+        hm = HealthMall(
+            clinic_id      = int(clinic_id_raw) if clinic_id_raw else None,
+            region         = data.get('region'),
+            district       = data.get('district'),
+            name           = data.get('name'),
+            specialties    = data.get('specialties'),
+            address        = data.get('address'),
+            phone          = data.get('phone'),
+            contact_person = data.get('contact_person'),
+            status         = data.get('health_mall_status', '合作中'),
+            start_date     = _parse_date(data.get('health_mall_start_date')),
+            note           = data.get('health_mall_note'),
         )
-        db.session.add(clinic)
+        db.session.add(hm)
         db.session.commit()
-        return jsonify({'success': True, 'id': clinic.id})
+        return jsonify({'success': True, 'id': hm.id})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'儲存失敗: {str(e)}'}), 500
 
-@app.route('/api/health-mall/<int:clinic_id>', methods=['PUT'])
-def update_health_mall(clinic_id):
+@app.route('/api/health-mall/<int:hm_id>', methods=['PUT'])
+def update_health_mall(hm_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
     try:
-        clinic = Clinic.query.get_or_404(clinic_id)
+        hm = HealthMall.query.get_or_404(hm_id)
         data = request.get_json()
-        clinic.region = data.get('region')
-        clinic.district = data.get('district')
-        clinic.name = data.get('name')
-        clinic.specialties = data.get('specialties')
-        clinic.address = data.get('address')
-        clinic.phone = data.get('phone')
-        clinic.contact_person = data.get('contact_person')
-        clinic.health_mall_status = data.get('health_mall_status', '合作中')
-        clinic.health_mall_start_date = _parse_date(data.get('health_mall_start_date'))
-        clinic.health_mall_note = data.get('health_mall_note')
+        clinic_id_raw = data.get('clinic_id')
+        hm.clinic_id      = int(clinic_id_raw) if clinic_id_raw else hm.clinic_id
+        hm.region         = data.get('region')
+        hm.district       = data.get('district')
+        hm.name           = data.get('name')
+        hm.specialties    = data.get('specialties')
+        hm.address        = data.get('address')
+        hm.phone          = data.get('phone')
+        hm.contact_person = data.get('contact_person')
+        hm.status         = data.get('health_mall_status', '合作中')
+        hm.start_date     = _parse_date(data.get('health_mall_start_date'))
+        hm.note           = data.get('health_mall_note')
+        hm.updated_at     = datetime.utcnow()
         db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'更新失敗: {str(e)}'}), 500
 
-@app.route('/api/health-mall/<int:clinic_id>', methods=['DELETE'])
-def delete_health_mall(clinic_id):
+@app.route('/api/health-mall/<int:hm_id>', methods=['DELETE'])
+def delete_health_mall(hm_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    clinic = Clinic.query.get_or_404(clinic_id)
-    db.session.delete(clinic)
+    hm = HealthMall.query.get_or_404(hm_id)
+    db.session.delete(hm)
     db.session.commit()
     return jsonify({'success': True})
 
@@ -313,24 +357,55 @@ def export_health_mall():
     specialty = request.args.get('specialty', '')
     status    = request.args.get('status', '')
 
-    query = Clinic.query.filter(Clinic.health_mall_status.in_(HM_STATUSES))
+    query = HealthMall.query
     if search:
         query = query.filter(
-            (Clinic.name.contains(search)) |
-            (Clinic.contact_person.contains(search))
+            HealthMall.name.contains(search) |
+            HealthMall.contact_person.contains(search)
         )
     if region:
-        query = query.filter(Clinic.region == region)
+        query = query.filter(HealthMall.region == region)
     if specialty:
-        query = query.filter(Clinic.specialties.contains(specialty))
+        query = query.filter(HealthMall.specialties.contains(specialty))
     if status:
-        query = query.filter(Clinic.health_mall_status == status)
+        query = query.filter(HealthMall.status == status)
 
-    clinics = query.all()
-    if not clinics:
+    items = query.all()
+    if not items:
         return jsonify({'error': '沒有符合條件的資料'}), 400
 
-    output = export_clinics(clinics)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '健康醫購'
+
+    headers = ['縣市', '區域', '診所名稱', '科別', '地址', '電話', '負責人', '合作狀態', '開始日期', '備註']
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color='11998E', end_color='11998E', fill_type='solid')
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    for h in items:
+        ws.append([
+            h.region or '', h.district or '', h.name or '',
+            h.specialties or '', h.address or '',
+            h.phone or '', h.contact_person or '',
+            h.status or '',
+            h.start_date.strftime('%Y-%m-%d') if h.start_date else '',
+            h.note or '',
+        ])
+
+    col_widths = [10, 10, 22, 18, 32, 15, 10, 10, 12, 24]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
     filename = f'健康醫購_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
     return send_file(
         output,
@@ -346,6 +421,7 @@ def export_health_mall():
 def get_analytics_stats():
     """整合統計 API：診所 + 健康醫購"""
     clinics = Clinic.query.all()
+    hm_all  = HealthMall.query.all()
 
     # 診所總數與縣市分布
     total = len(clinics)
@@ -361,19 +437,18 @@ def get_analytics_stats():
 
     # 合作項目分布
     col_items = {
-        '藥袋':    sum(1 for c in clinics if c.col_yaodai),
+        '藥袋':     sum(1 for c in clinics if c.col_yaodai),
         '海報/立牌': sum(1 for c in clinics if c.col_haibao),
-        '派樣':    sum(1 for c in clinics if c.col_paiyang),
-        '百位':    sum(1 for c in clinics if c.col_baiwei),
+        '派樣':     sum(1 for c in clinics if c.col_paiyang),
+        '百位':     sum(1 for c in clinics if c.col_baiwei),
     }
 
-    # 健康醫購
-    hm = [c for c in clinics if c.health_mall_status in ('合作中', '暫停', '結束')]
-    hm_total  = len(hm)
-    hm_active = sum(1 for c in hm if c.health_mall_status == '合作中')
-    hm_paused = sum(1 for c in hm if c.health_mall_status == '暫停')
-    hm_ended  = sum(1 for c in hm if c.health_mall_status == '結束')
-    hm_region_count = Counter(c.region for c in hm if c.region)
+    # 健康醫購（從獨立 table）
+    hm_total  = len(hm_all)
+    hm_active = sum(1 for h in hm_all if h.status == '合作中')
+    hm_paused = sum(1 for h in hm_all if h.status == '暫停')
+    hm_ended  = sum(1 for h in hm_all if h.status == '結束')
+    hm_region_count = Counter(h.region for h in hm_all if h.region)
 
     return jsonify({
         'total':            total,
@@ -423,9 +498,9 @@ def export_data():
     query = Clinic.query
     if search:
         query = query.filter(
-            (Clinic.name.contains(search)) |
-            (Clinic.address.contains(search)) |
-            (Clinic.contact_person.contains(search))
+            Clinic.name.contains(search) |
+            Clinic.address.contains(search) |
+            Clinic.contact_person.contains(search)
         )
     if region:
         query = query.filter(Clinic.region == region)
@@ -494,7 +569,6 @@ def campaign_match():
         ws = wb.active
         os.remove(temp_path)
 
-        # 以標題列取得欄位索引（不依賴固定 index）
         header = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
         col = {name: idx for idx, name in enumerate(header)}
         REQUIRED = {'電話'}
@@ -508,7 +582,6 @@ def campaign_match():
                 return ''
             return str(row[idx]).strip() if row[idx] is not None else ''
 
-        # 讀取上傳名單（跳過標題列）
         uploaded = []
         for row in ws.iter_rows(min_row=2, values_only=True):
             if not any(row):
@@ -522,7 +595,6 @@ def campaign_match():
                 'phone_n':  _normalize_phone(phone_raw),
             })
 
-        # 取得所有診所，建立電話 → 診所 map
         clinics = Clinic.query.all()
         phone_to_clinic = {}
         for c in clinics:
@@ -532,20 +604,17 @@ def campaign_match():
 
         uploaded_phones = {u['phone_n'] for u in uploaded if u['phone_n']}
 
-        # 已參加：上傳名單的電話在系統有對應
         matched = []
         for u in uploaded:
             if u['phone_n'] and u['phone_n'] in phone_to_clinic:
                 matched.append(_clinic_brief(phone_to_clinic[u['phone_n']]))
 
-        # 未參加：系統有、但上傳名單沒有
         not_joined = []
         for c in clinics:
             np = _normalize_phone(c.phone)
             if not np or np not in uploaded_phones:
                 not_joined.append(_clinic_brief(c))
 
-        # 系統未建立：上傳名單有、系統沒有
         not_in_system = []
         for u in uploaded:
             if not u['phone_n'] or u['phone_n'] not in phone_to_clinic:
@@ -557,9 +626,9 @@ def campaign_match():
                 })
 
         return jsonify({
-            'matched':        matched,
-            'not_joined':     not_joined,
-            'not_in_system':  not_in_system,
+            'matched':       matched,
+            'not_joined':    not_joined,
+            'not_in_system': not_in_system,
         })
 
     except Exception as e:
@@ -612,7 +681,6 @@ def export_not_joined():
 # ── 工具函式 ─────────────────────────────────────────────────
 
 def _normalize_phone(phone):
-    """去除非數字字元，用於電話比對"""
     return re.sub(r'\D', '', str(phone)) if phone else ''
 
 def _clinic_brief(c):
@@ -635,19 +703,21 @@ def _parse_date(s):
             return None
     return None
 
-def _hm_json(c):
+def _hm_json(h):
+    """HealthMall 物件 → JSON dict（保持與前端相容的欄位名稱）"""
     return {
-        'id': c.id,
-        'region': c.region,
-        'district': c.district,
-        'name': c.name,
-        'specialties': c.specialties,
-        'address': c.address,
-        'phone': c.phone,
-        'contact_person': c.contact_person,
-        'health_mall_status': c.health_mall_status or '否',
-        'health_mall_start_date': c.health_mall_start_date.strftime('%Y-%m-%d') if c.health_mall_start_date else '',
-        'health_mall_note': c.health_mall_note or '',
+        'id':                   h.id,
+        'clinic_id':            h.clinic_id,
+        'region':               h.region or '',
+        'district':             h.district or '',
+        'name':                 h.name or '',
+        'specialties':          h.specialties or '',
+        'address':              h.address or '',
+        'phone':                h.phone or '',
+        'contact_person':       h.contact_person or '',
+        'health_mall_status':   h.status or '合作中',
+        'health_mall_start_date': h.start_date.strftime('%Y-%m-%d') if h.start_date else '',
+        'health_mall_note':     h.note or '',
     }
 
 

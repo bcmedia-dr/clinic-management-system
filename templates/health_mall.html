@@ -181,6 +181,53 @@
             font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s;
         }
         .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(17,153,142,0.3); }
+
+        /* 診所選擇器 */
+        .clinic-picker-box {
+            background: #f0f9ff; border: 2px dashed #4facfe;
+            border-radius: 10px; padding: 15px; margin-bottom: 20px;
+        }
+        .clinic-picker-box label {
+            display: block; margin-bottom: 10px;
+            font-weight: 700; color: #1976d2; font-size: 14px;
+        }
+        .clinic-picker-row { display: flex; gap: 8px; }
+        .clinic-picker-row input {
+            flex: 1; padding: 10px 14px; border: 2px solid #b3d9f7;
+            border-radius: 8px; font-size: 14px; font-family: 'Noto Sans TC', sans-serif;
+        }
+        .clinic-picker-row input:focus { outline: none; border-color: #4facfe; }
+        .btn-picker-search {
+            padding: 10px 16px; background: #4facfe; color: white;
+            border: none; border-radius: 8px; cursor: pointer; font-size: 14px; white-space: nowrap;
+        }
+        .btn-picker-search:hover { background: #3a8fd9; }
+        .clinic-picker-results {
+            margin-top: 8px; max-height: 180px; overflow-y: auto;
+            border: 1px solid #b3d9f7; border-radius: 8px; background: white;
+        }
+        .picker-item {
+            padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #e8f4fd;
+            transition: background 0.15s;
+        }
+        .picker-item:last-child { border-bottom: none; }
+        .picker-item:hover { background: #e3f2fd; }
+        .picker-item-name { font-weight: 600; color: #333; font-size: 14px; }
+        .picker-item-meta { font-size: 12px; color: #666; margin-top: 2px; }
+        .picker-no-result { padding: 12px 14px; color: #999; font-size: 14px; text-align: center; }
+        .clinic-picker-selected {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 8px; padding: 8px 12px;
+            background: #d4edda; border-radius: 8px; font-size: 13px;
+        }
+        .clinic-picker-selected strong { color: #155724; }
+        .btn-picker-clear {
+            background: none; border: none; cursor: pointer; color: #721c24;
+            font-size: 16px; font-weight: 700; padding: 0 4px; line-height: 1;
+        }
+        .picker-divider {
+            border: none; border-top: 1px solid #e0e0e0; margin: 18px 0 20px;
+        }
     </style>
 </head>
 <body>
@@ -310,6 +357,22 @@
             </div>
             <form id="hmForm">
                 <input type="hidden" id="clinicId">
+                <input type="hidden" id="linkedClinicId">
+
+                <!-- 從診所總表選擇 -->
+                <div class="clinic-picker-box">
+                    <label>📋 從診所總表帶入基本資料（選填）</label>
+                    <div class="clinic-picker-row">
+                        <input type="text" id="clinicPickerInput" placeholder="輸入診所名稱或電話搜尋...">
+                        <button type="button" class="btn-picker-search" onclick="searchClinics()">搜尋</button>
+                    </div>
+                    <div id="clinicPickerResults" class="clinic-picker-results" style="display:none;"></div>
+                    <div id="clinicPickerSelected" class="clinic-picker-selected" style="display:none;">
+                        <span>已帶入：<strong id="clinicPickerName"></strong></span>
+                        <button type="button" class="btn-picker-clear" onclick="clearClinicPicker()" title="清除">✕</button>
+                    </div>
+                </div>
+                <hr class="picker-divider">
 
                 <div class="form-group">
                     <label>縣市 *</label>
@@ -414,6 +477,20 @@
                     updateSelectAllState();
                     updateDeleteButton();
                 }
+            });
+
+            // 診所選擇器：即時搜尋
+            document.getElementById('clinicPickerInput').addEventListener('input', function() {
+                clearTimeout(_pickerTimer);
+                const q = this.value.trim();
+                if (!q) {
+                    document.getElementById('clinicPickerResults').style.display = 'none';
+                    return;
+                }
+                _pickerTimer = setTimeout(() => searchClinics(), 300);
+            });
+            document.getElementById('clinicPickerInput').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); searchClinics(); }
             });
         });
 
@@ -553,6 +630,7 @@
             document.getElementById('modalTitle').textContent = '新增健康醫購診所';
             document.getElementById('hmForm').reset();
             document.getElementById('clinicId').value = '';
+            resetClinicPicker();
             document.getElementById('hmModal').style.display = 'block';
         }
 
@@ -580,6 +658,14 @@
                     cb.checked = specialties.includes(cb.value);
                 });
 
+                // 顯示已連結的診所總表資料
+                resetClinicPicker();
+                if (c.clinic_id) {
+                    document.getElementById('linkedClinicId').value = c.clinic_id;
+                    document.getElementById('clinicPickerName').textContent = c.name + '（已連結診所總表）';
+                    document.getElementById('clinicPickerSelected').style.display = 'flex';
+                }
+
                 document.getElementById('hmModal').style.display = 'block';
             } catch (err) {
                 console.error('載入失敗:', err);
@@ -590,12 +676,14 @@
         async function handleSubmit(e) {
             e.preventDefault();
             const id = document.getElementById('clinicId').value;
+            const linkedId = document.getElementById('linkedClinicId').value;
 
             const selectedSpecialties = Array.from(
                 document.querySelectorAll('#specialtyGroup input[type="checkbox"]:checked')
             ).map(cb => cb.value).join(',');
 
             const data = {
+                clinic_id:            linkedId ? parseInt(linkedId) : null,
                 region:               document.getElementById('region').value,
                 district:             document.getElementById('district').value,
                 name:                 document.getElementById('name').value,
@@ -626,6 +714,69 @@
                 console.error(err);
                 alert('儲存失敗：' + err.message);
             }
+        }
+
+        // ── 診所選擇器 ───────────────────────────────────────────
+        let _pickerCache = [];
+        let _pickerTimer = null;
+
+        async function searchClinics() {
+            const q = document.getElementById('clinicPickerInput').value.trim();
+            const resultsDiv = document.getElementById('clinicPickerResults');
+            if (!q) { resultsDiv.style.display = 'none'; return; }
+
+            try {
+                const res = await fetch(`/api/clinics/search?q=${encodeURIComponent(q)}`);
+                _pickerCache = await res.json();
+
+                if (_pickerCache.length === 0) {
+                    resultsDiv.innerHTML = '<div class="picker-no-result">找不到符合的診所</div>';
+                } else {
+                    resultsDiv.innerHTML = _pickerCache.map((c, i) => `
+                        <div class="picker-item" onclick="selectClinic(${i})">
+                            <div class="picker-item-name">${c.name}</div>
+                            <div class="picker-item-meta">${c.region}${c.district} ｜ ${c.phone}</div>
+                        </div>
+                    `).join('');
+                }
+                resultsDiv.style.display = 'block';
+            } catch (err) {
+                console.error('搜尋失敗:', err);
+            }
+        }
+
+        function selectClinic(idx) {
+            const c = _pickerCache[idx];
+            if (!c) return;
+
+            document.getElementById('linkedClinicId').value = c.id;
+            document.getElementById('region').value = c.region;
+            document.getElementById('district').value = c.district;
+            document.getElementById('name').value = c.name;
+            document.getElementById('address').value = c.address;
+            document.getElementById('phone').value = c.phone;
+            document.getElementById('contactPerson').value = c.contact_person;
+
+            const specialties = c.specialties ? c.specialties.split(',').map(s => s.trim()) : [];
+            document.querySelectorAll('#specialtyGroup input[type="checkbox"]').forEach(cb => {
+                cb.checked = specialties.includes(cb.value);
+            });
+
+            document.getElementById('clinicPickerName').textContent = c.name;
+            document.getElementById('clinicPickerSelected').style.display = 'flex';
+            document.getElementById('clinicPickerResults').style.display = 'none';
+            document.getElementById('clinicPickerInput').value = '';
+        }
+
+        function clearClinicPicker() {
+            document.getElementById('linkedClinicId').value = '';
+            document.getElementById('clinicPickerSelected').style.display = 'none';
+            document.getElementById('clinicPickerInput').value = '';
+        }
+
+        function resetClinicPicker() {
+            clearClinicPicker();
+            document.getElementById('clinicPickerResults').style.display = 'none';
         }
 
         async function deleteClinic(id) {
