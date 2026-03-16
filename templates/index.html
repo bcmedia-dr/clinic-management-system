@@ -706,6 +706,7 @@
                 <button class="btn-delete-batch" onclick="deleteSelected()" id="btnDeleteBatch" style="display: none;">🗑️ 刪除選中</button>
                 <button class="btn-export" onclick="exportData()">📥 匯出 Excel</button>
                 <button class="btn-import" onclick="showImportModal()">📤 匯入 Excel</button>
+                <button class="btn-import" onclick="showCustomImportModal()" style="background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);">📋 匯入自訂格式</button>
             </div>
         </div>
 
@@ -843,6 +844,40 @@
     </div>
 
     <!-- 匯入 Modal -->
+    <!-- 自訂格式匯入 Modal -->
+    <div class="modal" id="importCustomModal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📋 匯入自訂格式</h2>
+                <button class="close-btn" onclick="closeCustomImportModal()">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <p style="color: #666; font-size: 14px; line-height: 1.8;">
+                    📌 <strong>欄位對應說明：</strong><br>
+                    • <code>縣市</code> → 縣市　<code>區域</code> → 區域<br>
+                    • <code>院名</code> → 診所名稱（自動清理括號與斜線）<br>
+                    • <code>科別</code> → 科別　<code>院址</code> → 地址<br>
+                    • <code>電話</code> → 電話　<code>聯絡人</code> → 聯絡人<br>
+                    • <code>院長</code> → 忽略<br>
+                    <br>
+                    🔧 <strong>院名自動清理：</strong><br>
+                    • 括號內文字移至備註，例：<br>
+                    &nbsp;&nbsp;「許靜瑛小兒科（會拍照）」→ 名稱：許靜瑛小兒科，備註：會拍照<br>
+                    • 斜線後文字也移至備註，例：<br>
+                    &nbsp;&nbsp;「林建耀診所（回照很久）/ 3M清淨」→ 備註：回照很久 / 3M清淨<br>
+                    <br>
+                    ⚠️ 電話相同者自動跳過（重複檢查）。
+                </p>
+            </div>
+            <div class="form-group">
+                <label>選擇 Excel 檔案（.xlsx）</label>
+                <input type="file" id="importCustomFile" accept=".xlsx" style="padding: 10px; border: 2px dashed #e0e0e0; border-radius: 8px;">
+            </div>
+            <button class="btn-submit" onclick="uploadCustomFile()" style="background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);">開始匯入</button>
+            <div id="importCustomResult" style="margin-top: 20px; display: none;"></div>
+        </div>
+    </div>
+
     <div class="modal" id="importModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1299,10 +1334,9 @@
         }
 
         window.onclick = function(event) {
-            const modal = document.getElementById('clinicModal');
-            if (event.target == modal) closeModal();
-            const importModal = document.getElementById('importModal');
-            if (event.target == importModal) closeImportModal();
+            if (event.target == document.getElementById('clinicModal')) closeModal();
+            if (event.target == document.getElementById('importModal')) closeImportModal();
+            if (event.target == document.getElementById('importCustomModal')) closeCustomImportModal();
         };
 
         function exportData() {
@@ -1319,6 +1353,59 @@
 
         function closeImportModal() {
             document.getElementById('importModal').style.display = 'none';
+        }
+
+        function showCustomImportModal() {
+            document.getElementById('importCustomModal').style.display = 'block';
+            document.getElementById('importCustomFile').value = '';
+            document.getElementById('importCustomResult').style.display = 'none';
+        }
+
+        function closeCustomImportModal() {
+            document.getElementById('importCustomModal').style.display = 'none';
+        }
+
+        async function uploadCustomFile() {
+            const fileInput = document.getElementById('importCustomFile');
+            const file = fileInput.files[0];
+            if (!file) { alert('請選擇檔案'); return; }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/import-custom', { method: 'POST', body: formData });
+                const result = await response.json();
+                const resultDiv = document.getElementById('importCustomResult');
+
+                if (result.success) {
+                    let skippedHtml = '';
+                    if (result.skipped > 0) {
+                        skippedHtml = `<br><br>⚠️ 跳過 ${result.skipped} 筆（電話重複）：<br>${result.skipped_names.join('、')}`;
+                    }
+                    let errorHtml = '';
+                    if (result.errors > 0) {
+                        errorHtml = `<br><br>❌ 錯誤 ${result.errors} 筆：<br>${result.error_details.join('<br>')}`;
+                    }
+                    resultDiv.innerHTML = `
+                        <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
+                            <strong>✅ 匯入完成</strong><br>
+                            新增 ${result.imported} 筆${skippedHtml}${errorHtml}
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                    setTimeout(() => { closeCustomImportModal(); loadClinics(); loadStats(); }, 2500);
+                } else {
+                    resultDiv.innerHTML = `
+                        <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px;">
+                            <strong>❌ 匯入失敗</strong><br>${result.error}
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                alert('匯入失敗：' + error);
+            }
         }
 
         async function uploadFile() {

@@ -9,6 +9,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from werkzeug.utils import secure_filename
 from export import export_clinics
 from import_data import import_clinics, import_health_mall
+from import_custom import import_custom_clinics
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback-only-for-local')
@@ -543,6 +544,26 @@ def import_data():
     file.save(temp_path)
     with app.app_context():
         result = import_clinics(temp_path, db, Clinic)
+    os.remove(temp_path)
+    return jsonify(result)
+
+@app.route('/api/import-custom', methods=['POST'])
+def import_custom_data():
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    if 'file' not in request.files:
+        return jsonify({'error': '沒有上傳檔案'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': '沒有選擇檔案'}), 400
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': '只接受 .xlsx 格式'}), 400
+
+    filename = secure_filename(file.filename)
+    temp_path = os.path.join('/tmp', filename)
+    file.save(temp_path)
+    with app.app_context():
+        result = import_custom_clinics(temp_path, db, Clinic)
     os.remove(temp_path)
     return jsonify(result)
 
