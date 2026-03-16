@@ -323,6 +323,7 @@
                 <button class="btn-add" onclick="showAddModal()">➕ 新增診所</button>
                 <button class="btn-delete-batch" id="btnDeleteBatch" onclick="deleteSelected()" style="display:none;">🗑️ 刪除選中</button>
                 <button class="btn-export" onclick="exportData()">📥 匯出 Excel</button>
+                <button class="btn-export" onclick="showImportModal()" style="background:#764ba2;">📤 匯入 Excel</button>
             </div>
         </div>
 
@@ -806,15 +807,89 @@
 
         function logout() { window.location.href = '/logout'; }
 
-        window.onclick = function(e) {
-            if (e.target === document.getElementById('hmModal')) closeModal();
-        };
-
         function exportData() {
             const f = getFilters();
             const p = buildParams(f);
             window.location.href = `/api/health-mall/export?${p}`;
         }
+
+        function showImportModal() {
+            document.getElementById('hmImportModal').style.display = 'block';
+            document.getElementById('hmImportFile').value = '';
+            document.getElementById('hmImportResult').style.display = 'none';
+        }
+
+        function closeImportModal() {
+            document.getElementById('hmImportModal').style.display = 'none';
+        }
+
+        async function uploadHmFile() {
+            const fileInput = document.getElementById('hmImportFile');
+            const file = fileInput.files[0];
+            if (!file) { alert('請選擇檔案'); return; }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/health-mall/import', { method: 'POST', body: formData });
+                const result = await response.json();
+                const resultDiv = document.getElementById('hmImportResult');
+
+                if (result.success) {
+                    let skippedHtml = '';
+                    if (result.skipped > 0) {
+                        skippedHtml = `<br><br>⚠️ 跳過 ${result.skipped} 筆（電話重複）：<br>${result.skipped_names.join('、')}`;
+                    }
+                    resultDiv.innerHTML = `
+                        <div style="background:#d4edda;color:#155724;padding:15px;border-radius:8px;">
+                            <strong>✅ 匯入完成</strong><br>
+                            新增 ${result.imported} 筆${skippedHtml}
+                            ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
+                        </div>`;
+                    resultDiv.style.display = 'block';
+                    setTimeout(() => { closeImportModal(); loadStats(); loadClinics(); }, 2000);
+                } else {
+                    resultDiv.innerHTML = `
+                        <div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">
+                            <strong>❌ 匯入失敗</strong><br>${result.error}
+                        </div>`;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                alert('匯入失敗：' + error);
+            }
+        }
+
+        window.onclick = function(e) {
+            if (e.target === document.getElementById('hmModal')) closeModal();
+            if (e.target === document.getElementById('hmImportModal')) closeImportModal();
+        };
     </script>
+
+    <!-- 匯入 Modal -->
+    <div class="modal" id="hmImportModal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📤 匯入健康醫購資料</h2>
+                <button class="close-btn" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div style="margin-bottom:20px;">
+                <p style="color:#666;font-size:14px;">
+                    📋 檔案格式要求：<br>
+                    • 必須是 .xlsx 格式<br>
+                    • 欄位順序：縣市、區域、診所名稱、科別、地址、電話、負責人<br>
+                    • 可選欄位：合作狀態、開始日期（YYYY-MM-DD）、備註<br>
+                    • 診所名稱為必填；電話重複者自動跳過
+                </p>
+            </div>
+            <div class="form-group">
+                <label>選擇 Excel 檔案</label>
+                <input type="file" id="hmImportFile" accept=".xlsx" style="padding:10px;border:2px dashed #e0e0e0;border-radius:8px;">
+            </div>
+            <button class="btn-submit" onclick="uploadHmFile()">開始匯入</button>
+            <div id="hmImportResult" style="margin-top:20px;display:none;"></div>
+        </div>
+    </div>
 </body>
 </html>

@@ -8,7 +8,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from werkzeug.utils import secure_filename
 from export import export_clinics
-from import_data import import_clinics
+from import_data import import_clinics, import_health_mall
 
 app = Flask(__name__)
 app.secret_key = 'clinic-secret-key-bcmedia-2026'
@@ -31,8 +31,6 @@ class Clinic(db.Model):
     region         = db.Column(db.String(50))
     district       = db.Column(db.String(50))
     name           = db.Column(db.String(200))
-    health_mall    = db.Column(db.String(10), default='否')       # 舊欄位（保留）
-    hundred_position = db.Column(db.String(10), default='否')     # 舊欄位（保留）
     media_items    = db.Column(db.String(500))                    # 舊欄位（保留）
     specialties    = db.Column(db.String(500))
     address        = db.Column(db.String(300))
@@ -545,6 +543,26 @@ def import_data():
     file.save(temp_path)
     with app.app_context():
         result = import_clinics(temp_path, db, Clinic)
+    os.remove(temp_path)
+    return jsonify(result)
+
+@app.route('/api/health-mall/import', methods=['POST'])
+def import_health_mall_data():
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    if 'file' not in request.files:
+        return jsonify({'error': '沒有上傳檔案'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': '沒有選擇檔案'}), 400
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': '只接受 .xlsx 格式'}), 400
+
+    filename = secure_filename(file.filename)
+    temp_path = os.path.join('/tmp', filename)
+    file.save(temp_path)
+    with app.app_context():
+        result = import_health_mall(temp_path, db, HealthMall)
     os.remove(temp_path)
     return jsonify(result)
 

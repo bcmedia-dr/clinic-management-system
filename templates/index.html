@@ -1244,10 +1244,14 @@
                 const resultDiv = document.getElementById('importResult');
 
                 if (result.success) {
+                    let skippedHtml = '';
+                    if (result.skipped > 0) {
+                        skippedHtml = `<br><br>⚠️ 跳過 ${result.skipped} 筆（電話重複）：<br>${result.skipped_names.join('、')}`;
+                    }
                     resultDiv.innerHTML = `
                         <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
-                            <strong>✅ 匯入成功</strong><br>
-                            成功匯入 ${result.imported} 筆資料
+                            <strong>✅ 匯入完成</strong><br>
+                            新增 ${result.imported} 筆${skippedHtml}
                             ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
                         </div>
                     `;
