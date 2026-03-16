@@ -11,7 +11,7 @@ from export import export_clinics
 from import_data import import_clinics, import_health_mall
 
 app = Flask(__name__)
-app.secret_key = 'clinic-secret-key-bcmedia-2026'
+app.secret_key = os.environ.get('SECRET_KEY', 'fallback-only-for-local')
 
 # 資料庫設定
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///clinics.db')
@@ -98,11 +98,11 @@ def login():
         data = request.get_json()
         username = data.get('username')
         password = data.get('password')
-        if username == 'admin' and password == 'Bcm13011579!@':
+        if username == 'admin' and password == os.environ.get('ADMIN_PASSWORD', 'local-admin'):
             session['user'] = 'admin'
             session['role'] = 'admin'
             return jsonify({'success': True})
-        elif username == 'user' and password == 'Bcm13011579':
+        elif username == 'user' and password == os.environ.get('USER_PASSWORD', 'local-user'):
             session['user'] = 'user'
             session['role'] = 'user'
             return jsonify({'success': True})

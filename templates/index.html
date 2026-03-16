@@ -75,6 +75,9 @@
             border-color: white;
         }
 
+        .field-error-border { border-color: #dc3545 !important; }
+        .field-error-msg { color: #dc3545; font-size: 12px; margin-top: 4px; }
+
         .header-right {
             display: flex;
             align-items: center;
@@ -838,6 +841,7 @@
 
     <script>
         let currentEditId = null;
+        let _searchTimer = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
@@ -849,7 +853,10 @@
             document.getElementById('filterRegion').addEventListener('change', applyFilters);
             document.getElementById('filterSpecialty').addEventListener('change', applyFilters);
             document.getElementById('filterColItem').addEventListener('change', applyFilters);
-            document.getElementById('searchInput').addEventListener('input', applyFilters);
+            document.getElementById('searchInput').addEventListener('input', function() {
+                clearTimeout(_searchTimer);
+                _searchTimer = setTimeout(applyFilters, 300);
+            });
             document.getElementById('clinicForm').addEventListener('submit', handleSubmit);
 
             // 全選功能
@@ -1133,8 +1140,38 @@
             }
         }
 
+        function clearFormErrors() {
+            document.querySelectorAll('#clinicForm .field-error-border').forEach(el => el.classList.remove('field-error-border'));
+            document.querySelectorAll('#clinicForm .field-error-msg').forEach(el => el.remove());
+        }
+
+        function validateClinicForm() {
+            clearFormErrors();
+            const required = [
+                { id: 'region',        label: '縣市' },
+                { id: 'district',      label: '區域' },
+                { id: 'name',          label: '診所名稱' },
+                { id: 'phone',         label: '電話' },
+                { id: 'contactPerson', label: '聯絡人' },
+            ];
+            let valid = true;
+            for (const f of required) {
+                const el = document.getElementById(f.id);
+                if (!el.value.trim()) {
+                    el.classList.add('field-error-border');
+                    const msg = document.createElement('div');
+                    msg.className = 'field-error-msg';
+                    msg.textContent = '此欄位為必填';
+                    el.insertAdjacentElement('afterend', msg);
+                    valid = false;
+                }
+            }
+            return valid;
+        }
+
         async function handleSubmit(e) {
             e.preventDefault();
+            if (!validateClinicForm()) return;
 
             const selectedSpecialties = Array.from(
                 document.querySelectorAll('#specialtyGroup input[type="checkbox"]:checked')
@@ -1201,6 +1238,7 @@
 
         function closeModal() {
             document.getElementById('clinicModal').style.display = 'none';
+            clearFormErrors();
         }
 
         function logout() {
