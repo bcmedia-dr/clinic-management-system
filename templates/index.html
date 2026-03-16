@@ -78,6 +78,28 @@
         .field-error-border { border-color: #dc3545 !important; }
         .field-error-msg { color: #dc3545; font-size: 12px; margin-top: 4px; }
 
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 20px 0 8px;
+        }
+        .page-btn {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Noto Sans TC', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .page-btn:hover:not(:disabled) { background: #667eea; color: white; }
+        .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .page-info { font-size: 14px; color: #666; }
+
         .header-right {
             display: flex;
             align-items: center;
@@ -708,6 +730,11 @@
                 </tbody>
             </table>
         </div>
+        <div class="pagination-bar" id="paginationBar" style="display:none;">
+            <button class="page-btn" id="btnPrev" onclick="goPage(currentPage - 1)">‹ 上一頁</button>
+            <span class="page-info" id="pageInfo"></span>
+            <button class="page-btn" id="btnNext" onclick="goPage(currentPage + 1)">下一頁 ›</button>
+        </div>
     </div>
 
     <!-- 新增/編輯 Modal -->
@@ -842,6 +869,9 @@
     <script>
         let currentEditId = null;
         let _searchTimer = null;
+        let allClinics = [];
+        let currentPage = 1;
+        const PAGE_SIZE = 50;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
@@ -1005,83 +1035,106 @@
                 const params = buildParams(filters);
                 const response = await fetch(`/api/clinics?${params}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const clinics = await response.json();
-
-                const tbody = document.getElementById('clinicsTable');
-                tbody.innerHTML = '';
-
-                if (clinics.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">沒有符合條件的診所</td></tr>';
-                    return;
-                }
-
-                clinics.forEach((clinic, index) => {
-                    // 科別標籤
-                    const specialties = clinic.specialties
-                        ? clinic.specialties.split(',').map(s => `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
-                        : '';
-
-                    // 合作項目標籤
-                    const colTags = [];
-                    if (clinic.col_yaodai)  colTags.push('<span class="col-tag yaodai">藥袋</span>');
-                    if (clinic.col_haibao)  colTags.push('<span class="col-tag haibao">海報/立牌</span>');
-                    if (clinic.col_paiyang) colTags.push('<span class="col-tag paiyang">派樣</span>');
-                    if (clinic.col_baiwei)  colTags.push('<span class="col-tag baiwei">百位</span>');
-                    const colItemsDisplay = colTags.length > 0 ? colTags.join(' ') : '<span style="color:#ccc;">-</span>';
-
-                    const row = document.createElement('tr');
-                    row.setAttribute('data-clinic-id', clinic.id);
-                    row.innerHTML = `
-                        <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${clinic.id}"></td>
-                        <td>${index + 1}</td>
-                        <td>${clinic.region || ''}</td>
-                        <td>${clinic.district || ''}</td>
-                        <td title="${clinic.name}">${clinic.name}</td>
-                        <td>${specialties}</td>
-                        <td>${clinic.phone || ''}</td>
-                        <td>${clinic.contact_person || ''}</td>
-                        <td>${colItemsDisplay}</td>
-                        <td>
-                            <button class="btn-edit" onclick="editClinic(${clinic.id})">編輯</button>
-                            <button class="btn-detail" onclick="toggleDetail(${clinic.id})">詳細</button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-
-                    // 詳細資訊列
-                    const detailRow = document.createElement('tr');
-                    detailRow.className = 'detail-row';
-                    detailRow.setAttribute('data-detail-for', clinic.id);
-                    detailRow.innerHTML = `
-                        <td colspan="10">
-                            <div class="detail-content">
-                                <h4>詳細資訊</h4>
-                                <div class="detail-info">
-                                    <div class="detail-item">
-                                        <label>地址</label>
-                                        <span>${clinic.address || '未設定'}</span>
-                                    </div>
-                                    <div class="detail-item">
-                                        <label>營業時間</label>
-                                        <span>${clinic.business_hours || '未設定'}</span>
-                                    </div>
-                                    <div class="detail-item">
-                                        <label>備註</label>
-                                        <span>${clinic.note || '無備註'}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </td>
-                    `;
-                    tbody.appendChild(detailRow);
-                });
-
-                updateSelectAllState();
+                allClinics = await response.json();
+                renderPage(1);
             } catch (error) {
                 console.error('載入診所失敗:', error);
                 alert('載入資料失敗: ' + error.message);
             }
         }
+
+        function renderPage(page) {
+            const total = allClinics.length;
+            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            currentPage = Math.max(1, Math.min(page, totalPages));
+
+            const start = (currentPage - 1) * PAGE_SIZE;
+            const pageData = allClinics.slice(start, start + PAGE_SIZE);
+
+            const tbody = document.getElementById('clinicsTable');
+            tbody.innerHTML = '';
+
+            if (total === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">沒有符合條件的診所</td></tr>';
+                document.getElementById('paginationBar').style.display = 'none';
+                return;
+            }
+
+            pageData.forEach((clinic, index) => {
+                const rowNum = start + index + 1;
+
+                const specialties = clinic.specialties
+                    ? clinic.specialties.split(',').map(s => `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
+                    : '';
+
+                const colTags = [];
+                if (clinic.col_yaodai)  colTags.push('<span class="col-tag yaodai">藥袋</span>');
+                if (clinic.col_haibao)  colTags.push('<span class="col-tag haibao">海報/立牌</span>');
+                if (clinic.col_paiyang) colTags.push('<span class="col-tag paiyang">派樣</span>');
+                if (clinic.col_baiwei)  colTags.push('<span class="col-tag baiwei">百位</span>');
+                const colItemsDisplay = colTags.length > 0 ? colTags.join(' ') : '<span style="color:#ccc;">-</span>';
+
+                const row = document.createElement('tr');
+                row.setAttribute('data-clinic-id', clinic.id);
+                row.innerHTML = `
+                    <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${clinic.id}"></td>
+                    <td>${rowNum}</td>
+                    <td>${clinic.region || ''}</td>
+                    <td>${clinic.district || ''}</td>
+                    <td title="${clinic.name}">${clinic.name}</td>
+                    <td>${specialties}</td>
+                    <td>${clinic.phone || ''}</td>
+                    <td>${clinic.contact_person || ''}</td>
+                    <td>${colItemsDisplay}</td>
+                    <td>
+                        <button class="btn-edit" onclick="editClinic(${clinic.id})">編輯</button>
+                        <button class="btn-detail" onclick="toggleDetail(${clinic.id})">詳細</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+
+                const detailRow = document.createElement('tr');
+                detailRow.className = 'detail-row';
+                detailRow.setAttribute('data-detail-for', clinic.id);
+                detailRow.innerHTML = `
+                    <td colspan="10">
+                        <div class="detail-content">
+                            <h4>詳細資訊</h4>
+                            <div class="detail-info">
+                                <div class="detail-item">
+                                    <label>地址</label>
+                                    <span>${clinic.address || '未設定'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>營業時間</label>
+                                    <span>${clinic.business_hours || '未設定'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>備註</label>
+                                    <span>${clinic.note || '無備註'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(detailRow);
+            });
+
+            updateSelectAllState();
+            updatePagination(total);
+        }
+
+        function updatePagination(total) {
+            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            const bar = document.getElementById('paginationBar');
+            bar.style.display = total <= PAGE_SIZE ? 'none' : 'flex';
+            document.getElementById('btnPrev').disabled = currentPage <= 1;
+            document.getElementById('btnNext').disabled = currentPage >= totalPages;
+            document.getElementById('pageInfo').textContent =
+                `第 ${currentPage} / ${totalPages} 頁（共 ${total} 筆）`;
+        }
+
+        function goPage(page) { renderPage(page); }
 
         function toggleDetail(clinicId) {
             const detailRow = document.querySelector(`tr[data-detail-for="${clinicId}"]`);

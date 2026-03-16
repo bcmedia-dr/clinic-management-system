@@ -675,12 +675,12 @@ def export_not_joined():
     wb = Workbook()
     ws = wb.active
     ws.title = '未參加診所'
-    ws.append(['縣市', '區域', '診所名稱', '科別', '地址', '電話', '負責人'])
+    ws.append(['縣市', '區域', '診所名稱', '科別', '地址', '電話', '負責人', '備註'])
     for c in clinics:
         ws.append([
             c.region or '', c.district or '', c.name or '',
             c.specialties or '', c.address or '',
-            c.phone or '', c.contact_person or '',
+            c.phone or '', c.contact_person or '', c.note or '',
         ])
 
     output = BytesIO()

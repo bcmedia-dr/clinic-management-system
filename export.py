@@ -11,7 +11,7 @@ def export_clinics(clinics):
     ws.title = "診所清單"
     
     # 設定欄位標題（按照你要的順序）
-    headers = ['縣市', '區域', '診所名稱', '科別', '地址', '電話', '負責人']
+    headers = ['縣市', '區域', '診所名稱', '科別', '地址', '電話', '負責人', '備註']
     
     # 寫入標題列（第1行）
     for col_num, header in enumerate(headers, 1):
@@ -36,7 +36,8 @@ def export_clinics(clinics):
             clinic.specialties or '',
             clinic.address or '',
             clinic.phone or '',
-            clinic.contact_person or ''
+            clinic.contact_person or '',
+            clinic.note or '',
         ]
         
         for col_num, value in enumerate(row_data, 1):
@@ -58,7 +59,8 @@ def export_clinics(clinics):
         'D': 20,  # 科別
         'E': 35,  # 地址
         'F': 15,  # 電話
-        'G': 12   # 負責人
+        'G': 12,  # 負責人
+        'H': 30,  # 備註
     }
     
     for col, width in column_widths.items():

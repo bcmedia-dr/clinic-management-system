@@ -36,6 +36,28 @@
         .nav-btn.active { background: white; color: #11998e; border-color: white; }
         .field-error-border { border-color: #dc3545 !important; }
         .field-error-msg { color: #dc3545; font-size: 12px; margin-top: 4px; }
+
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 20px 0 8px;
+        }
+        .page-btn {
+            background: white;
+            color: #11998e;
+            border: 2px solid #11998e;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Noto Sans TC', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .page-btn:hover:not(:disabled) { background: #11998e; color: white; }
+        .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .page-info { font-size: 14px; color: #666; }
         .header-right { display: flex; align-items: center; gap: 20px; }
         .user-info { display: flex; align-items: center; gap: 10px; }
         .btn-logout {
@@ -349,6 +371,11 @@
                 <tbody id="hmTable"></tbody>
             </table>
         </div>
+        <div class="pagination-bar" id="paginationBar" style="display:none;">
+            <button class="page-btn" id="btnPrev" onclick="goPage(hmCurrentPage - 1)">‹ 上一頁</button>
+            <span class="page-info" id="pageInfo"></span>
+            <button class="page-btn" id="btnNext" onclick="goPage(hmCurrentPage + 1)">下一頁 ›</button>
+        </div>
     </div>
 
     <!-- 新增/編輯 Modal -->
@@ -463,6 +490,9 @@
 
     <script>
         let _searchTimer = null;
+        let allHmClinics = [];
+        let hmCurrentPage = 1;
+        const PAGE_SIZE = 50;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
@@ -520,6 +550,18 @@
             return p;
         }
 
+        function updatePagination(total) {
+            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            const bar = document.getElementById('paginationBar');
+            bar.style.display = total <= PAGE_SIZE ? 'none' : 'flex';
+            document.getElementById('btnPrev').disabled = hmCurrentPage <= 1;
+            document.getElementById('btnNext').disabled = hmCurrentPage >= totalPages;
+            document.getElementById('pageInfo').textContent =
+                `第 ${hmCurrentPage} / ${totalPages} 頁（共 ${total} 筆）`;
+        }
+
+        function goPage(page) { renderPage(page); }
+
         function applyFilters() { loadClinics(); loadStats(); }
 
         async function loadStats() {
@@ -576,50 +618,64 @@
                 const p = buildParams(f);
                 const res = await fetch(`/api/health-mall?${p}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const clinics = await res.json();
-
-                const tbody = document.getElementById('hmTable');
-                tbody.innerHTML = '';
-
-                if (clinics.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;">尚無健康醫購診所資料</td></tr>';
-                    return;
-                }
-
-                clinics.forEach((c, idx) => {
-                    const specialties = c.specialties
-                        ? c.specialties.split(',').map(s => `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
-                        : '';
-
-                    const statusMap = { '合作中': 'active', '暫停': 'paused', '結束': 'ended' };
-                    const statusClass = statusMap[c.health_mall_status] || 'ended';
-                    const statusTag = `<span class="status-tag ${statusClass}">${c.health_mall_status}</span>`;
-
-                    const row = document.createElement('tr');
-                    row.setAttribute('data-clinic-id', c.id);
-                    row.innerHTML = `
-                        <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${c.id}"></td>
-                        <td>${idx + 1}</td>
-                        <td>${c.region || ''}</td>
-                        <td>${c.district || ''}</td>
-                        <td title="${c.name}">${c.name}</td>
-                        <td>${specialties}</td>
-                        <td>${c.phone || ''}</td>
-                        <td>${c.contact_person || ''}</td>
-                        <td>${statusTag}</td>
-                        <td>
-                            <button class="btn-edit" onclick="editClinic(${c.id})">編輯</button>
-                            <button class="btn-delete" onclick="deleteClinic(${c.id})">刪除</button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
-
-                updateSelectAllState();
+                allHmClinics = await res.json();
+                renderPage(1);
             } catch (err) {
                 console.error('載入失敗:', err);
                 alert('載入資料失敗: ' + err.message);
             }
+        }
+
+        function renderPage(page) {
+            const total = allHmClinics.length;
+            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            hmCurrentPage = Math.max(1, Math.min(page, totalPages));
+
+            const start = (hmCurrentPage - 1) * PAGE_SIZE;
+            const pageData = allHmClinics.slice(start, start + PAGE_SIZE);
+
+            const tbody = document.getElementById('hmTable');
+            tbody.innerHTML = '';
+
+            if (total === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;">尚無健康醫購診所資料</td></tr>';
+                document.getElementById('paginationBar').style.display = 'none';
+                return;
+            }
+
+            pageData.forEach((c, idx) => {
+                const rowNum = start + idx + 1;
+
+                const specialties = c.specialties
+                    ? c.specialties.split(',').map(s => `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
+                    : '';
+
+                const statusMap = { '合作中': 'active', '暫停': 'paused', '結束': 'ended' };
+                const statusClass = statusMap[c.health_mall_status] || 'ended';
+                const statusTag = `<span class="status-tag ${statusClass}">${c.health_mall_status}</span>`;
+
+                const row = document.createElement('tr');
+                row.setAttribute('data-clinic-id', c.id);
+                row.innerHTML = `
+                    <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${c.id}"></td>
+                    <td>${rowNum}</td>
+                    <td>${c.region || ''}</td>
+                    <td>${c.district || ''}</td>
+                    <td title="${c.name}">${c.name}</td>
+                    <td>${specialties}</td>
+                    <td>${c.phone || ''}</td>
+                    <td>${c.contact_person || ''}</td>
+                    <td>${statusTag}</td>
+                    <td>
+                        <button class="btn-edit" onclick="editClinic(${c.id})">編輯</button>
+                        <button class="btn-delete" onclick="deleteClinic(${c.id})">刪除</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            updateSelectAllState();
+            updatePagination(total);
         }
 
         function updateSelectAllState() {
