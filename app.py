@@ -842,15 +842,17 @@ def import_campaign_clinics(campaign_id):
 
         header = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
         col    = {name: idx for idx, name in enumerate(header)}
+
+        # 支援雙名稱欄位
+        def _resolve(row, *candidates):
+            for field in candidates:
+                idx = col.get(field)
+                if idx is not None and idx < len(row) and row[idx] is not None:
+                    return str(row[idx]).strip()
+            return ''
+
         if '電話' not in col:
             return jsonify({'error': 'Excel 缺少必要欄位：電話'}), 400
-
-        def _get(row, field):
-            idx = col.get(field)
-            if idx is None or idx >= len(row):
-                return ''
-            v = row[idx]
-            return str(v).strip() if v is not None else ''
 
         phone_to_clinic = {}
         for c in Clinic.query.all():
@@ -867,7 +869,7 @@ def import_campaign_clinics(campaign_id):
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if not any(row):
                 continue
-            phone_raw  = _get(row, '電話')
+            phone_raw  = _resolve(row, '電話')
             normalized = _normalize_phone(phone_raw)
             if not normalized:
                 errors.append(f'第{row_num}列：缺少電話')
@@ -877,18 +879,25 @@ def import_campaign_clinics(campaign_id):
                 clinic = phone_to_clinic[normalized]
                 already_exists += 1
             else:
-                name = _get(row, '診所名稱')
-                if not name:
+                raw_name = _resolve(row, '診所名稱', '院名')
+                if not raw_name:
                     errors.append(f'第{row_num}列：總表無此電話且缺少診所名稱')
                     continue
+                # 套用院名清理邏輯（括號/斜線內容移到備註）
+                from import_custom import _parse_name
+                name, extracted_note = _parse_name(raw_name)
+                if not name:
+                    errors.append(f'第{row_num}列：清理後診所名稱為空（原始值：{raw_name}）')
+                    continue
                 clinic = Clinic(
-                    region=_get(row, '縣市') or None,
-                    district=_get(row, '區域') or None,
-                    name=name,
-                    specialties=_get(row, '科別') or None,
-                    address=_get(row, '地址') or None,
-                    phone=phone_raw,
-                    contact_person=_get(row, '負責人') or None,
+                    region        =_resolve(row, '縣市') or None,
+                    district      =_resolve(row, '區域') or None,
+                    name          =name,
+                    specialties   =_resolve(row, '科別') or None,
+                    address       =_resolve(row, '地址', '院址') or None,
+                    phone         =phone_raw,
+                    contact_person=_resolve(row, '負責人', '聯絡人') or None,
+                    note          =extracted_note or None,
                 )
                 db.session.add(clinic)
                 db.session.flush()
