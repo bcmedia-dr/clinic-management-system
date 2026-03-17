@@ -1084,14 +1084,19 @@ def _hm_json(h):
 
 with app.app_context():
     db.create_all()
-    try:
-        with db.engine.connect() as _conn:
-            _conn.execute(text(
-                'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS month INTEGER'
-            ))
-            _conn.commit()
-    except Exception:
-        pass
+    # 逐一補上歷次新增的欄位，IF NOT EXISTS 確保重複執行也安全
+    _migrations = [
+        'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS month INTEGER',
+        'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS cooperation_items VARCHAR(200)',
+        'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS cooperation_other VARCHAR(200)',
+    ]
+    for _sql in _migrations:
+        try:
+            with db.engine.connect() as _conn:
+                _conn.execute(text(_sql))
+                _conn.commit()
+        except Exception:
+            pass
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8081, debug=True)
