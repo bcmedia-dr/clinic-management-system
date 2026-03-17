@@ -625,6 +625,7 @@
             <a href="/" class="nav-btn active">📋 診所管理</a>
             <a href="/health-mall" class="nav-btn">🏪 健康醫購</a>
             <a href="/campaign-match" class="nav-btn">🎯 活動比對</a>
+            <a href="/campaign-history" class="nav-btn">📅 活動記錄</a>
             <a href="/analytics" class="nav-btn">📊 統計分析</a>
         </div>
     </div>
@@ -1148,6 +1149,10 @@
                                     <label>備註</label>
                                     <span>${clinic.note || '無備註'}</span>
                                 </div>
+                                <div class="detail-item" style="grid-column:1/-1;">
+                                    <label>活動記錄</label>
+                                    <div id="campaign-history-${clinic.id}" style="font-size:13px;color:#999;">點擊詳細後載入...</div>
+                                </div>
                             </div>
                         </div>
                     </td>
@@ -1171,13 +1176,44 @@
 
         function goPage(page) { renderPage(page); }
 
-        function toggleDetail(clinicId) {
+        async function toggleDetail(clinicId) {
             const detailRow = document.querySelector(`tr[data-detail-for="${clinicId}"]`);
             if (!detailRow) return;
             document.querySelectorAll('.detail-row.active').forEach(row => {
                 if (row !== detailRow) row.classList.remove('active');
             });
             detailRow.classList.toggle('active');
+
+            if (detailRow.classList.contains('active') && !detailRow.dataset.campaignsLoaded) {
+                const div = document.getElementById(`campaign-history-${clinicId}`);
+                if (div) {
+                    try {
+                        const res       = await fetch(`/api/clinics/${clinicId}/campaigns`);
+                        const campaigns = await res.json();
+                        if (campaigns.length === 0) {
+                            div.innerHTML = '<span style="color:#bbb;">尚無活動記錄</span>';
+                        } else {
+                            div.innerHTML = `<table style="border-collapse:collapse;margin-top:4px;">
+                                <thead><tr style="background:#f5f7fa;">
+                                    <th style="padding:5px 14px;font-size:12px;text-align:left;color:#555;">活動名稱</th>
+                                    <th style="padding:5px 14px;font-size:12px;text-align:left;color:#555;">年份</th>
+                                    <th style="padding:5px 14px;font-size:12px;text-align:left;color:#555;">參加日期</th>
+                                </tr></thead>
+                                <tbody>${campaigns.map(c => `
+                                    <tr>
+                                        <td style="padding:5px 14px;font-size:13px;">${c.campaign_name}</td>
+                                        <td style="padding:5px 14px;font-size:13px;">${c.year || '-'}</td>
+                                        <td style="padding:5px 14px;font-size:13px;">${c.joined_at}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>`;
+                        }
+                        detailRow.dataset.campaignsLoaded = 'true';
+                    } catch(e) {
+                        div.innerHTML = '<span style="color:#bbb;">載入失敗</span>';
+                    }
+                }
+            }
         }
 
         function showAddModal() {

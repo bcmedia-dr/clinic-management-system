@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活動記錄 - Bcmedia 診所管理系統</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #e96c2c 0%, #f7b733 100%);
+            color: white; padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo { font-size: 32px; }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .nav { display: flex; gap: 10px; margin-top: 15px; }
+        .nav-btn {
+            background: rgba(255,255,255,0.2); color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px; border-radius: 8px;
+            text-decoration: none; font-size: 14px;
+            transition: all 0.3s; display: inline-block;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.3); }
+        .nav-btn.active { background: white; color: #e96c2c; border-color: white; }
+        .btn-logout {
+            background: rgba(255,255,255,0.2); color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+        /* ── Layout ── */
+        .layout {
+            display: flex;
+            gap: 0;
+            height: calc(100vh - 110px);
+        }
+
+        /* ── Left Panel ── */
+        .left-panel {
+            width: 300px;
+            min-width: 300px;
+            background: white;
+            border-right: 2px solid #eee;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .left-header {
+            padding: 20px 16px 12px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .left-header h2 { font-size: 16px; font-weight: 700; color: #333; }
+        .btn-add-campaign {
+            background: linear-gradient(135deg, #e96c2c 0%, #f7b733 100%);
+            color: white; border: none; padding: 7px 14px;
+            border-radius: 8px; font-size: 13px; cursor: pointer;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .btn-add-campaign:hover { opacity: 0.9; }
+
+        .campaign-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .campaign-item {
+            padding: 14px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 6px;
+            border: 2px solid transparent;
+            position: relative;
+        }
+        .campaign-item:hover { background: #fff8f0; border-color: #f7b733; }
+        .campaign-item.selected { background: #fff3e8; border-color: #e96c2c; }
+        .campaign-item-name { font-weight: 600; font-size: 15px; color: #333; }
+        .campaign-item-meta { font-size: 12px; color: #999; margin-top: 4px; }
+        .campaign-item-count {
+            font-size: 12px; color: #e96c2c; font-weight: 600; margin-top: 2px;
+        }
+        .btn-delete-campaign {
+            position: absolute; top: 10px; right: 10px;
+            background: none; border: none; color: #ccc;
+            font-size: 16px; cursor: pointer; padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .btn-delete-campaign:hover { background: #fee2e2; color: #dc3545; }
+
+        /* ── Right Panel ── */
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #f5f7fa;
+        }
+        .right-empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            color: #bbb;
+        }
+        .right-empty .icon { font-size: 60px; }
+        .right-empty p { font-size: 16px; }
+
+        .right-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+        .campaign-detail-header {
+            background: white;
+            padding: 20px 24px 16px;
+            border-bottom: 2px solid #eee;
+        }
+        .campaign-detail-header h2 { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 6px; }
+        .campaign-meta-row { display: flex; gap: 20px; font-size: 13px; color: #888; flex-wrap: wrap; }
+        .campaign-meta-row span strong { color: #555; }
+
+        .campaign-actions {
+            background: white;
+            padding: 12px 24px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn-action {
+            padding: 8px 18px; border-radius: 8px;
+            font-size: 13px; font-family: 'Noto Sans TC', sans-serif;
+            cursor: pointer; border: none; font-weight: 600;
+        }
+        .btn-import-campaign {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-export-campaign {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        .btn-action:hover { opacity: 0.88; }
+
+        .filter-row {
+            background: white;
+            padding: 10px 24px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .filter-select {
+            padding: 7px 12px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-family: 'Noto Sans TC', sans-serif;
+            font-size: 13px; outline: none; background: white;
+        }
+        .filter-select:focus { border-color: #e96c2c; }
+        .total-count { font-size: 13px; color: #888; margin-left: auto; }
+
+        .table-wrapper { flex: 1; overflow-y: auto; padding: 16px 20px; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        th {
+            background: linear-gradient(135deg, #e96c2c 0%, #f7b733 100%);
+            color: white; padding: 12px 14px; text-align: left; font-size: 13px; font-weight: 600;
+        }
+        td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fff8f0; }
+
+        .specialty-tag {
+            display: inline-block; background: #e8f4fd; color: #2196f3;
+            padding: 2px 8px; border-radius: 4px; font-size: 11px; margin: 1px;
+        }
+        .empty-td { text-align: center; padding: 50px; color: #bbb; font-size: 15px; }
+
+        /* ── Modals ── */
+        .modal {
+            display: none; position: fixed; z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background: white; margin: 8% auto; padding: 30px;
+            border-radius: 16px; width: 90%; max-width: 480px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h2 { font-size: 18px; font-weight: 700; }
+        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+        .close-btn:hover { color: #333; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #555; }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 10px 12px;
+            border: 2px solid #e0e0e0; border-radius: 8px;
+            font-family: 'Noto Sans TC', sans-serif; font-size: 14px; outline: none;
+        }
+        .form-group input:focus, .form-group textarea:focus { border-color: #e96c2c; }
+        .btn-submit {
+            width: 100%; padding: 12px;
+            background: linear-gradient(135deg, #e96c2c 0%, #f7b733 100%);
+            color: white; border: none; border-radius: 10px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .btn-submit:hover { opacity: 0.9; }
+        .import-result { margin-top: 16px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="header-left">
+                <div class="logo">🏥</div>
+                <h1>Bcmedia 診所管理系統</h1>
+            </div>
+            <div class="header-right">
+                <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+            </div>
+        </div>
+        <div class="nav">
+            <a href="/" class="nav-btn">📋 診所管理</a>
+            <a href="/health-mall" class="nav-btn">🏪 健康醫購</a>
+            <a href="/campaign-match" class="nav-btn">🎯 活動比對</a>
+            <a href="/campaign-history" class="nav-btn active">📅 活動記錄</a>
+            <a href="/analytics" class="nav-btn">📊 統計分析</a>
+        </div>
+    </div>
+
+    <div class="layout">
+        <!-- 左欄：活動列表 -->
+        <div class="left-panel">
+            <div class="left-header">
+                <h2>活動列表</h2>
+                <button class="btn-add-campaign" onclick="showAddModal()">＋ 新增活動</button>
+            </div>
+            <div class="campaign-list" id="campaignList">
+                <div style="text-align:center;padding:40px;color:#bbb;">載入中...</div>
+            </div>
+        </div>
+
+        <!-- 右欄：活動詳細 -->
+        <div class="right-panel" id="rightPanel">
+            <div class="right-empty" id="rightEmpty">
+                <div class="icon">📅</div>
+                <p>請從左側選擇一個活動</p>
+            </div>
+            <div class="right-content" id="rightContent" style="display:none;">
+                <div class="campaign-detail-header">
+                    <h2 id="detailName"></h2>
+                    <div class="campaign-meta-row">
+                        <span><strong>品牌：</strong><span id="detailBrand">-</span></span>
+                        <span><strong>年份：</strong><span id="detailYear">-</span></span>
+                        <span><strong>參加診所：</strong><span id="detailCount">0</span> 間</span>
+                        <span id="detailNoteWrap" style="display:none;"><strong>備註：</strong><span id="detailNote"></span></span>
+                    </div>
+                </div>
+                <div class="campaign-actions">
+                    <button class="btn-action btn-import-campaign" onclick="showImportModal()">📤 匯入名單</button>
+                    <button class="btn-action btn-export-campaign" onclick="exportClinics()">📥 匯出名單</button>
+                </div>
+                <div class="filter-row">
+                    <select class="filter-select" id="filterRegion" onchange="loadCampaignClinics()">
+                        <option value="">全部縣市</option>
+                        <option value="臺北市">臺北市</option><option value="新北市">新北市</option>
+                        <option value="桃園市">桃園市</option><option value="新竹市">新竹市</option>
+                        <option value="新竹縣">新竹縣</option><option value="苗栗縣">苗栗縣</option>
+                        <option value="臺中市">臺中市</option><option value="彰化縣">彰化縣</option>
+                        <option value="南投縣">南投縣</option><option value="雲林縣">雲林縣</option>
+                        <option value="嘉義市">嘉義市</option><option value="嘉義縣">嘉義縣</option>
+                        <option value="臺南市">臺南市</option><option value="高雄市">高雄市</option>
+                        <option value="屏東縣">屏東縣</option><option value="基隆市">基隆市</option>
+                        <option value="宜蘭縣">宜蘭縣</option><option value="花蓮縣">花蓮縣</option>
+                        <option value="臺東縣">臺東縣</option>
+                    </select>
+                    <select class="filter-select" id="filterSpecialty" onchange="loadCampaignClinics()">
+                        <option value="">全部科別</option>
+                        <option value="小兒科">小兒科</option><option value="家醫科">家醫科</option>
+                        <option value="耳鼻喉科">耳鼻喉科</option><option value="內科">內科</option>
+                        <option value="外科">外科</option><option value="醫美">醫美</option>
+                        <option value="皮膚科">皮膚科</option><option value="婦產科">婦產科</option>
+                        <option value="泌尿科">泌尿科</option><option value="復健/骨科">復健/骨科</option>
+                        <option value="牙科">牙科</option><option value="中醫">中醫</option>
+                        <option value="產後護理之家">產後護理之家</option>
+                    </select>
+                    <span class="total-count" id="filteredCount"></span>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>縣市</th><th>區域</th><th>診所名稱</th>
+                                <th>科別</th><th>電話</th><th>聯絡人</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clinicTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增活動 Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>➕ 新增活動</h2>
+                <button class="close-btn" onclick="closeAddModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>品牌名稱 <span style="color:#999;font-weight:400;">（例：舒跑）</span></label>
+                <input type="text" id="inputBrand" placeholder="舒跑">
+            </div>
+            <div class="form-group">
+                <label>年份</label>
+                <input type="number" id="inputYear" placeholder="2025" min="2000" max="2099">
+            </div>
+            <div class="form-group">
+                <label>活動名稱 <span style="color:#999;font-weight:400;">（留空則自動用「品牌+年份」）</span></label>
+                <input type="text" id="inputName" placeholder="留空則自動產生">
+            </div>
+            <div class="form-group">
+                <label>備註</label>
+                <textarea id="inputNote" rows="2" placeholder="選填"></textarea>
+            </div>
+            <button class="btn-submit" onclick="createCampaign()">新增活動</button>
+        </div>
+    </div>
+
+    <!-- 匯入名單 Modal -->
+    <div class="modal" id="importModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📤 匯入活動名單</h2>
+                <button class="close-btn" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div style="margin-bottom:16px;">
+                <p style="color:#666;font-size:13px;line-height:1.8;">
+                    📋 欄位格式：縣市、區域、診所名稱、科別、地址、<strong>電話</strong>（必填）、負責人<br>
+                    • 電話在總表有 → 記錄參加活動<br>
+                    • 電話在總表沒有 → 先新增到總表，再記錄參加活動
+                </p>
+            </div>
+            <div class="form-group">
+                <label>選擇 Excel 檔案（.xlsx）</label>
+                <input type="file" id="importFile" accept=".xlsx"
+                    style="padding:10px;border:2px dashed #e0e0e0;border-radius:8px;">
+            </div>
+            <button class="btn-submit" onclick="uploadImport()">開始匯入</button>
+            <div class="import-result" id="importResult"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentCampaignId   = null;
+        let currentCampaignName = '';
+
+        document.addEventListener('DOMContentLoaded', loadCampaigns);
+
+        // ── 活動列表 ─────────────────────────────────────────
+
+        async function loadCampaigns() {
+            try {
+                const res  = await fetch('/api/campaigns');
+                const list = await res.json();
+                const div  = document.getElementById('campaignList');
+                if (list.length === 0) {
+                    div.innerHTML = '<div style="text-align:center;padding:40px;color:#bbb;">尚無活動，點上方按鈕新增</div>';
+                    return;
+                }
+                div.innerHTML = list.map(c => `
+                    <div class="campaign-item${c.id === currentCampaignId ? ' selected' : ''}"
+                         id="campaign-item-${c.id}" onclick="selectCampaign(${c.id})">
+                        <div class="campaign-item-name">${c.name}</div>
+                        <div class="campaign-item-meta">${c.brand || ''}${c.year ? '  ' + c.year : ''}</div>
+                        <div class="campaign-item-count">📍 ${c.clinic_count} 間診所</div>
+                        <button class="btn-delete-campaign"
+                            onclick="event.stopPropagation(); deleteCampaign(${c.id}, '${c.name.replace(/'/g,"\\'")}')">✕</button>
+                    </div>
+                `).join('');
+            } catch(e) {
+                document.getElementById('campaignList').innerHTML =
+                    '<div style="text-align:center;padding:40px;color:#f00;">載入失敗</div>';
+            }
+        }
+
+        async function selectCampaign(id) {
+            currentCampaignId = id;
+            document.querySelectorAll('.campaign-item').forEach(el => el.classList.remove('selected'));
+            const el = document.getElementById(`campaign-item-${id}`);
+            if (el) el.classList.add('selected');
+
+            const res      = await fetch('/api/campaigns');
+            const list     = await res.json();
+            const campaign = list.find(c => c.id === id);
+            if (!campaign) return;
+
+            currentCampaignName = campaign.name;
+            document.getElementById('detailName').textContent  = campaign.name;
+            document.getElementById('detailBrand').textContent = campaign.brand || '-';
+            document.getElementById('detailYear').textContent  = campaign.year  || '-';
+            document.getElementById('detailCount').textContent = campaign.clinic_count;
+            if (campaign.note) {
+                document.getElementById('detailNote').textContent = campaign.note;
+                document.getElementById('detailNoteWrap').style.display = '';
+            } else {
+                document.getElementById('detailNoteWrap').style.display = 'none';
+            }
+            document.getElementById('filterRegion').value    = '';
+            document.getElementById('filterSpecialty').value = '';
+            document.getElementById('rightEmpty').style.display   = 'none';
+            document.getElementById('rightContent').style.display = 'flex';
+            loadCampaignClinics();
+        }
+
+        async function loadCampaignClinics() {
+            if (!currentCampaignId) return;
+            const region    = document.getElementById('filterRegion').value;
+            const specialty = document.getElementById('filterSpecialty').value;
+            const params    = new URLSearchParams();
+            if (region)    params.set('region', region);
+            if (specialty) params.set('specialty', specialty);
+            try {
+                const res    = await fetch(`/api/campaigns/${currentCampaignId}/clinics?${params}`);
+                const clinics = await res.json();
+                document.getElementById('filteredCount').textContent =
+                    `共 ${clinics.length} 筆`;
+                const tbody = document.getElementById('clinicTable');
+                if (clinics.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-td">尚無資料</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = clinics.map(c => {
+                    const spec = c.specialties
+                        ? c.specialties.split(',').map(s =>
+                            `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
+                        : '';
+                    return `<tr>
+                        <td>${c.region}</td><td>${c.district}</td>
+                        <td>${c.name}</td><td>${spec}</td>
+                        <td>${c.phone}</td><td>${c.contact_person}</td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {
+                document.getElementById('clinicTable').innerHTML =
+                    '<tr><td colspan="6" class="empty-td">載入失敗</td></tr>';
+            }
+        }
+
+        async function deleteCampaign(id, name) {
+            if (!confirm(`確定要刪除活動「${name}」及其所有參加記錄嗎？`)) return;
+            try {
+                const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    if (currentCampaignId === id) {
+                        currentCampaignId = null;
+                        document.getElementById('rightEmpty').style.display   = 'flex';
+                        document.getElementById('rightContent').style.display = 'none';
+                    }
+                    loadCampaigns();
+                } else {
+                    const e = await res.json();
+                    alert(e.error || '刪除失敗');
+                }
+            } catch(e) { alert('刪除失敗：' + e.message); }
+        }
+
+        function exportClinics() {
+            if (!currentCampaignId) return;
+            const region    = document.getElementById('filterRegion').value;
+            const specialty = document.getElementById('filterSpecialty').value;
+            const params    = new URLSearchParams();
+            if (region)    params.set('region', region);
+            if (specialty) params.set('specialty', specialty);
+            window.location.href = `/api/campaigns/${currentCampaignId}/export?${params}`;
+        }
+
+        // ── 新增活動 Modal ────────────────────────────────────
+
+        function showAddModal() { document.getElementById('addModal').style.display = 'block'; }
+        function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
+
+        async function createCampaign() {
+            const brand = document.getElementById('inputBrand').value.trim();
+            const year  = document.getElementById('inputYear').value.trim();
+            const name  = document.getElementById('inputName').value.trim();
+            const note  = document.getElementById('inputNote').value.trim();
+            if (!brand && !name) { alert('請輸入品牌名稱或活動名稱'); return; }
+            try {
+                const res = await fetch('/api/campaigns', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ brand, year: year ? parseInt(year) : null, name, note }),
+                });
+                const result = await res.json();
+                if (result.success) {
+                    closeAddModal();
+                    document.getElementById('inputBrand').value = '';
+                    document.getElementById('inputYear').value  = '';
+                    document.getElementById('inputName').value  = '';
+                    document.getElementById('inputNote').value  = '';
+                    await loadCampaigns();
+                    selectCampaign(result.id);
+                } else {
+                    alert(result.error || '新增失敗');
+                }
+            } catch(e) { alert('新增失敗：' + e.message); }
+        }
+
+        // ── 匯入 Modal ───────────────────────────────────────
+
+        function showImportModal() {
+            document.getElementById('importFile').value = '';
+            document.getElementById('importResult').style.display = 'none';
+            document.getElementById('importModal').style.display  = 'block';
+        }
+        function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
+
+        async function uploadImport() {
+            const file = document.getElementById('importFile').files[0];
+            if (!file) { alert('請選擇檔案'); return; }
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res    = await fetch(`/api/campaigns/${currentCampaignId}/import`,
+                    { method: 'POST', body: formData });
+                const result = await res.json();
+                const div    = document.getElementById('importResult');
+                div.style.display = 'block';
+                if (result.success) {
+                    let errHtml = result.errors.length > 0
+                        ? `<br><br>⚠️ 略過 ${result.errors.length} 筆錯誤：<br>${result.errors.join('<br>')}`
+                        : '';
+                    div.innerHTML = `<div style="background:#d4edda;color:#155724;padding:14px;border-radius:8px;">
+                        <strong>✅ 匯入完成</strong><br>
+                        新增診所 ${result.new_clinics} 間 ／
+                        總表已有 ${result.already_exists} 間 ／
+                        記錄參加 ${result.recorded} 間
+                        ${result.already_in_campaign > 0 ? `（已在活動中 ${result.already_in_campaign} 間）` : ''}
+                        ${errHtml}
+                    </div>`;
+                    setTimeout(() => {
+                        closeImportModal();
+                        selectCampaign(currentCampaignId);
+                        loadCampaigns();
+                    }, 2500);
+                } else {
+                    div.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:14px;border-radius:8px;">
+                        <strong>❌ 匯入失敗</strong><br>${result.error}</div>`;
+                }
+            } catch(e) { alert('匯入失敗：' + e.message); }
+        }
+
+        // ── 關閉 Modal ───────────────────────────────────────
+        window.onclick = function(e) {
+            if (e.target === document.getElementById('addModal'))    closeAddModal();
+            if (e.target === document.getElementById('importModal')) closeImportModal();
+        };
+    </script>
+</body>
+</html>

@@ -67,6 +67,28 @@ class HealthMall(db.Model):
     clinic = db.relationship('Clinic', backref=db.backref('health_mall_records', lazy=True))
 
 
+class Campaign(db.Model):
+    __tablename__ = 'campaign'
+    id         = db.Column(db.Integer, primary_key=True)
+    name       = db.Column(db.String(200), nullable=False)
+    brand      = db.Column(db.String(100))
+    year       = db.Column(db.Integer)
+    note       = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CampaignClinic(db.Model):
+    __tablename__ = 'campaign_clinic'
+    id          = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
+    clinic_id   = db.Column(db.Integer, db.ForeignKey('clinic.id'), nullable=False)
+    joined_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('campaign_id', 'clinic_id', name='uq_campaign_clinic'),)
+
+    campaign = db.relationship('Campaign', backref=db.backref('clinic_links', lazy=True))
+    clinic   = db.relationship('Clinic',   backref=db.backref('campaign_links', lazy=True))
+
+
 # ── 頁面路由 ────────────────────────────────────────────────
 
 @app.route('/')
@@ -86,6 +108,12 @@ def analytics():
     if 'user' not in session:
         return redirect(url_for('login'))
     return render_template('analytics.html')
+
+@app.route('/campaign-history')
+def campaign_history_page():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('campaign_history.html')
 
 @app.route('/campaign-match')
 def campaign_match_page():
@@ -715,6 +743,229 @@ def export_not_joined():
         as_attachment=True,
         download_name=filename
     )
+
+
+# ── 活動記錄 API ─────────────────────────────────────────────
+
+@app.route('/api/campaigns', methods=['GET'])
+def get_campaigns():
+    campaigns = Campaign.query.order_by(Campaign.year.desc(), Campaign.created_at.desc()).all()
+    result = []
+    for c in campaigns:
+        count = CampaignClinic.query.filter_by(campaign_id=c.id).count()
+        result.append({
+            'id':           c.id,
+            'name':         c.name,
+            'brand':        c.brand or '',
+            'year':         c.year,
+            'note':         c.note or '',
+            'clinic_count': count,
+            'created_at':   c.created_at.strftime('%Y-%m-%d') if c.created_at else '',
+        })
+    return jsonify(result)
+
+@app.route('/api/campaigns', methods=['POST'])
+def create_campaign():
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    data  = request.get_json()
+    brand = (data.get('brand') or '').strip()
+    year  = data.get('year')
+    note  = data.get('note') or ''
+    name  = (data.get('name') or '').strip() or f"{brand}{year or ''}".strip()
+    if not name:
+        return jsonify({'error': '請輸入活動名稱或品牌'}), 400
+    c = Campaign(name=name, brand=brand or None,
+                 year=int(year) if year else None, note=note or None)
+    db.session.add(c)
+    db.session.commit()
+    return jsonify({'success': True, 'id': c.id, 'name': c.name})
+
+@app.route('/api/campaigns/<int:campaign_id>', methods=['DELETE'])
+def delete_campaign(campaign_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    campaign = Campaign.query.get_or_404(campaign_id)
+    CampaignClinic.query.filter_by(campaign_id=campaign_id).delete()
+    db.session.delete(campaign)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/campaigns/<int:campaign_id>/clinics', methods=['GET'])
+def get_campaign_clinics(campaign_id):
+    Campaign.query.get_or_404(campaign_id)
+    region    = request.args.get('region', '')
+    specialty = request.args.get('specialty', '')
+    links = CampaignClinic.query.filter_by(campaign_id=campaign_id).all()
+    result = []
+    for link in links:
+        c = link.clinic
+        if not c:
+            continue
+        if region and c.region != region:
+            continue
+        if specialty and (not c.specialties or specialty not in c.specialties):
+            continue
+        result.append({
+            'id':             c.id,
+            'region':         c.region or '',
+            'district':       c.district or '',
+            'name':           c.name or '',
+            'specialties':    c.specialties or '',
+            'address':        c.address or '',
+            'phone':          c.phone or '',
+            'contact_person': c.contact_person or '',
+            'note':           c.note or '',
+            'joined_at':      link.joined_at.strftime('%Y-%m-%d') if link.joined_at else '',
+        })
+    return jsonify(result)
+
+@app.route('/api/campaigns/<int:campaign_id>/import', methods=['POST'])
+def import_campaign_clinics(campaign_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    Campaign.query.get_or_404(campaign_id)
+    if 'file' not in request.files:
+        return jsonify({'error': '沒有上傳檔案'}), 400
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': '只接受 .xlsx 格式'}), 400
+
+    filename  = secure_filename(file.filename)
+    temp_path = os.path.join('/tmp', filename)
+    file.save(temp_path)
+
+    try:
+        wb = load_workbook(temp_path)
+        ws = wb.active
+        os.remove(temp_path)
+
+        header = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+        col    = {name: idx for idx, name in enumerate(header)}
+        if '電話' not in col:
+            return jsonify({'error': 'Excel 缺少必要欄位：電話'}), 400
+
+        def _get(row, field):
+            idx = col.get(field)
+            if idx is None or idx >= len(row):
+                return ''
+            v = row[idx]
+            return str(v).strip() if v is not None else ''
+
+        phone_to_clinic = {}
+        for c in Clinic.query.all():
+            np = _normalize_phone(c.phone)
+            if np:
+                phone_to_clinic[np] = c
+
+        in_campaign = {cc.clinic_id for cc in
+                       CampaignClinic.query.filter_by(campaign_id=campaign_id).all()}
+
+        new_clinics_count = already_exists = recorded = already_in_campaign = 0
+        errors = []
+
+        for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not any(row):
+                continue
+            phone_raw  = _get(row, '電話')
+            normalized = _normalize_phone(phone_raw)
+            if not normalized:
+                errors.append(f'第{row_num}列：缺少電話')
+                continue
+
+            if normalized in phone_to_clinic:
+                clinic = phone_to_clinic[normalized]
+                already_exists += 1
+            else:
+                name = _get(row, '診所名稱')
+                if not name:
+                    errors.append(f'第{row_num}列：總表無此電話且缺少診所名稱')
+                    continue
+                clinic = Clinic(
+                    region=_get(row, '縣市') or None,
+                    district=_get(row, '區域') or None,
+                    name=name,
+                    specialties=_get(row, '科別') or None,
+                    address=_get(row, '地址') or None,
+                    phone=phone_raw,
+                    contact_person=_get(row, '負責人') or None,
+                )
+                db.session.add(clinic)
+                db.session.flush()
+                phone_to_clinic[normalized] = clinic
+                new_clinics_count += 1
+
+            if clinic.id in in_campaign:
+                already_in_campaign += 1
+                continue
+            db.session.add(CampaignClinic(campaign_id=campaign_id, clinic_id=clinic.id))
+            in_campaign.add(clinic.id)
+            recorded += 1
+
+        db.session.commit()
+        return jsonify({
+            'success':            True,
+            'new_clinics':        new_clinics_count,
+            'already_exists':     already_exists,
+            'recorded':           recorded,
+            'already_in_campaign': already_in_campaign,
+            'errors':             errors,
+        })
+
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        db.session.rollback()
+        return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
+
+@app.route('/api/campaigns/<int:campaign_id>/export', methods=['GET'])
+def export_campaign_clinics(campaign_id):
+    campaign = Campaign.query.get_or_404(campaign_id)
+    links    = CampaignClinic.query.filter_by(campaign_id=campaign_id).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = campaign.name[:28]
+    headers  = ['縣市', '區域', '診所名稱', '科別', '地址', '電話', '聯絡人', '備註']
+    ws.append(headers)
+    fill = PatternFill(start_color='E96C2C', end_color='E96C2C', fill_type='solid')
+    for i in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=i)
+        cell.font      = Font(bold=True, color='FFFFFF')
+        cell.fill      = fill
+        cell.alignment = Alignment(horizontal='center')
+    for link in links:
+        c = link.clinic
+        if not c:
+            continue
+        ws.append([c.region or '', c.district or '', c.name or '',
+                   c.specialties or '', c.address or '',
+                   c.phone or '', c.contact_person or '', c.note or ''])
+    for i, w in enumerate([10, 10, 22, 18, 32, 15, 10, 24], 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    filename = f'{campaign.name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    return send_file(output,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+@app.route('/api/clinics/<int:clinic_id>/campaigns', methods=['GET'])
+def get_clinic_campaigns(clinic_id):
+    links = CampaignClinic.query.filter_by(clinic_id=clinic_id).all()
+    result = []
+    for link in links:
+        c = link.campaign
+        result.append({
+            'campaign_id':   c.id,
+            'campaign_name': c.name,
+            'brand':         c.brand or '',
+            'year':          c.year,
+            'joined_at':     link.joined_at.strftime('%Y-%m-%d') if link.joined_at else '',
+        })
+    return jsonify(result)
 
 
 # ── 工具函式 ─────────────────────────────────────────────────
