@@ -225,6 +225,39 @@
         }
         .btn-submit:hover { opacity: 0.9; }
         .import-result { margin-top: 16px; display: none; }
+
+        /* modal 有更多欄位時允許捲動 */
+        .modal-content { max-height: 90vh; overflow-y: auto; }
+
+        /* ── 合作項目勾選框 ── */
+        .checkbox-group {
+            display: flex; flex-wrap: wrap; gap: 10px;
+            padding: 10px 0 4px;
+        }
+        .checkbox-label {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 14px; font-weight: 400; color: #333;
+            cursor: pointer;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: 16px; height: 16px; cursor: pointer;
+            border: none; padding: 0; accent-color: #e96c2c;
+        }
+
+        /* ── 合作項目標籤 ── */
+        .coop-tag {
+            display: inline-block;
+            background: #fff3e8; color: #e96c2c;
+            border: 1px solid #f7b733;
+            padding: 2px 8px; border-radius: 4px;
+            font-size: 11px; margin: 2px 2px 0 0;
+            font-weight: 600;
+        }
+        .coop-tag-other {
+            background: #f0f4ff; color: #5c6bc0;
+            border-color: #9fa8da;
+        }
+        .campaign-item-coop { margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -274,6 +307,8 @@
                         <span><strong>參加診所：</strong><span id="detailCount">0</span> 間</span>
                         <span id="detailNoteWrap" style="display:none;"><strong>備註：</strong><span id="detailNote"></span></span>
                     </div>
+                    <!-- 合作項目標籤列 -->
+                    <div id="detailCoopWrap" style="margin-top:8px;display:none;"></div>
                 </div>
                 <div class="campaign-actions">
                     <button class="btn-action btn-import-campaign" onclick="showImportModal()">📤 匯入名單</button>
@@ -355,6 +390,16 @@
                 <label>備註</label>
                 <textarea id="inputNote" rows="2" placeholder="選填"></textarea>
             </div>
+            <div class="form-group">
+                <label>合作項目</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label"><input type="checkbox" id="addCoop_藥袋" value="藥袋"> 藥袋</label>
+                    <label class="checkbox-label"><input type="checkbox" id="addCoop_海報" value="海報"> 海報</label>
+                    <label class="checkbox-label"><input type="checkbox" id="addCoop_立牌" value="立牌"> 立牌</label>
+                    <label class="checkbox-label"><input type="checkbox" id="addCoop_派樣" value="派樣"> 派樣</label>
+                </div>
+                <input type="text" id="addCoopOther" placeholder="其他（自由填寫）" style="margin-top:8px;">
+            </div>
             <!-- 紅字驗證提示 -->
             <div id="addFormError" style="color:#dc3545;font-size:13px;margin-bottom:12px;display:none;"></div>
             <button class="btn-submit" onclick="createCampaign()">新增活動</button>
@@ -391,6 +436,16 @@
             <div class="form-group">
                 <label>備註</label>
                 <textarea id="editNote" rows="2" placeholder="選填"></textarea>
+            </div>
+            <div class="form-group">
+                <label>合作項目</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label"><input type="checkbox" id="editCoop_藥袋" value="藥袋"> 藥袋</label>
+                    <label class="checkbox-label"><input type="checkbox" id="editCoop_海報" value="海報"> 海報</label>
+                    <label class="checkbox-label"><input type="checkbox" id="editCoop_立牌" value="立牌"> 立牌</label>
+                    <label class="checkbox-label"><input type="checkbox" id="editCoop_派樣" value="派樣"> 派樣</label>
+                </div>
+                <input type="text" id="editCoopOther" placeholder="其他（自由填寫）" style="margin-top:8px;">
             </div>
             <!-- 紅字驗證提示 -->
             <div id="editFormError" style="color:#dc3545;font-size:13px;margin-bottom:12px;display:none;"></div>
@@ -434,6 +489,33 @@
             return '-';
         }
 
+        // ── 合作項目 helper ────────────────────────────────────
+        const COOP_ITEMS = ['藥袋', '海報', '立牌', '派樣'];
+
+        // 取得勾選的合作項目，逗號分隔字串
+        function getCoopItems(prefix) {
+            return COOP_ITEMS
+                .filter(item => document.getElementById(`${prefix}Coop_${item}`).checked)
+                .join(',');
+        }
+
+        // 依據逗號分隔字串設定勾選狀態
+        function setCoopItems(prefix, itemsStr) {
+            const selected = itemsStr ? itemsStr.split(',').map(s => s.trim()) : [];
+            COOP_ITEMS.forEach(item => {
+                document.getElementById(`${prefix}Coop_${item}`).checked = selected.includes(item);
+            });
+        }
+
+        // 產生合作項目標籤 HTML
+        function renderCoopTags(items, other) {
+            const tags = [];
+            if (items) items.split(',').filter(t => t.trim()).forEach(t =>
+                tags.push(`<span class="coop-tag">${t.trim()}</span>`));
+            if (other) tags.push(`<span class="coop-tag coop-tag-other">其他：${other}</span>`);
+            return tags.join('');
+        }
+
         document.addEventListener('DOMContentLoaded', loadCampaigns);
 
         // ── 活動列表 ─────────────────────────────────────────
@@ -448,18 +530,22 @@
                     div.innerHTML = '<div style="text-align:center;padding:40px;color:#bbb;">尚無活動，點上方按鈕新增</div>';
                     return;
                 }
-                div.innerHTML = list.map(c => `
+                div.innerHTML = list.map(c => {
+                    const coopHtml = renderCoopTags(c.cooperation_items, c.cooperation_other);
+                    return `
                     <div class="campaign-item${c.id === currentCampaignId ? ' selected' : ''}"
                          id="campaign-item-${c.id}" onclick="selectCampaign(${c.id})">
                         <div class="campaign-item-name">${c.name}</div>
                         <div class="campaign-item-meta">${c.brand || ''}${c.brand && (c.year || c.month) ? '　' : ''}${fmtPeriod(c.year, c.month) !== '-' ? fmtPeriod(c.year, c.month) : ''}</div>
                         <div class="campaign-item-count">📍 ${c.clinic_count} 間診所</div>
+                        ${coopHtml ? `<div class="campaign-item-coop">${coopHtml}</div>` : ''}
                         <button class="btn-edit-campaign"
                             onclick="event.stopPropagation(); openEditModal(${c.id})">✎</button>
                         <button class="btn-delete-campaign"
                             onclick="event.stopPropagation(); deleteCampaign(${c.id}, '${c.name.replace(/'/g,"\\'")}')">✕</button>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
             } catch(e) {
                 document.getElementById('campaignList').innerHTML =
                     '<div style="text-align:center;padding:40px;color:#f00;">載入失敗</div>';
@@ -487,6 +573,15 @@
                 document.getElementById('detailNoteWrap').style.display = '';
             } else {
                 document.getElementById('detailNoteWrap').style.display = 'none';
+            }
+            // 合作項目標籤
+            const coopHtml = renderCoopTags(campaign.cooperation_items, campaign.cooperation_other);
+            const coopWrap = document.getElementById('detailCoopWrap');
+            if (coopHtml) {
+                coopWrap.innerHTML = `<strong style="font-size:13px;color:#555;">合作項目：</strong>${coopHtml}`;
+                coopWrap.style.display = '';
+            } else {
+                coopWrap.style.display = 'none';
             }
             document.getElementById('filterRegion').value    = '';
             document.getElementById('filterSpecialty').value = '';
@@ -571,6 +666,8 @@
             const month  = document.getElementById('inputMonth').value;
             const name   = document.getElementById('inputName').value.trim();
             const note   = document.getElementById('inputNote').value.trim();
+            const coopItems = getCoopItems('add');
+            const coopOther = document.getElementById('addCoopOther').value.trim();
             const errEl  = document.getElementById('addFormError');
 
             // 必填驗證
@@ -601,16 +698,20 @@
                         year:  parseInt(year),
                         month: parseInt(month),
                         name, note,
+                        cooperation_items: coopItems,
+                        cooperation_other: coopOther,
                     }),
                 });
                 const result = await res.json();
                 if (result.success) {
                     closeAddModal();
-                    document.getElementById('inputBrand').value = '';
-                    document.getElementById('inputYear').value  = '';
-                    document.getElementById('inputMonth').value = '';
-                    document.getElementById('inputName').value  = '';
-                    document.getElementById('inputNote').value  = '';
+                    document.getElementById('inputBrand').value    = '';
+                    document.getElementById('inputYear').value     = '';
+                    document.getElementById('inputMonth').value    = '';
+                    document.getElementById('inputName').value     = '';
+                    document.getElementById('inputNote').value     = '';
+                    document.getElementById('addCoopOther').value  = '';
+                    setCoopItems('add', '');
                     await loadCampaigns();
                     selectCampaign(result.id);
                 } else {
@@ -630,10 +731,12 @@
             if (!c) return;
             editingCampaignId = id;
             // 預填現有資料
-            document.getElementById('editBrand').value = c.brand || '';
-            document.getElementById('editYear').value  = c.year  || '';
-            document.getElementById('editMonth').value = c.month || '';
-            document.getElementById('editNote').value  = c.note  || '';
+            document.getElementById('editBrand').value     = c.brand || '';
+            document.getElementById('editYear').value      = c.year  || '';
+            document.getElementById('editMonth').value     = c.month || '';
+            document.getElementById('editNote').value      = c.note  || '';
+            document.getElementById('editCoopOther').value = c.cooperation_other || '';
+            setCoopItems('edit', c.cooperation_items || '');
             document.getElementById('editFormError').style.display = 'none';
             document.getElementById('editModal').style.display = 'block';
         }
@@ -644,11 +747,13 @@
         }
 
         async function saveEditCampaign() {
-            const brand = document.getElementById('editBrand').value.trim();
-            const year  = document.getElementById('editYear').value.trim();
-            const month = document.getElementById('editMonth').value;
-            const note  = document.getElementById('editNote').value.trim();
-            const errEl = document.getElementById('editFormError');
+            const brand     = document.getElementById('editBrand').value.trim();
+            const year      = document.getElementById('editYear').value.trim();
+            const month     = document.getElementById('editMonth').value;
+            const note      = document.getElementById('editNote').value.trim();
+            const coopItems = getCoopItems('edit');
+            const coopOther = document.getElementById('editCoopOther').value.trim();
+            const errEl     = document.getElementById('editFormError');
 
             // 必填驗證
             if (!year && !month) {
@@ -669,7 +774,11 @@
                 const res = await fetch(`/api/campaigns/${editingCampaignId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ brand, year: parseInt(year), month: parseInt(month), note }),
+                    body: JSON.stringify({
+                        brand, year: parseInt(year), month: parseInt(month), note,
+                        cooperation_items: coopItems,
+                        cooperation_other: coopOther,
+                    }),
                 });
                 const result = await res.json();
                 if (result.success) {

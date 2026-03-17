@@ -70,13 +70,15 @@ class HealthMall(db.Model):
 
 class Campaign(db.Model):
     __tablename__ = 'campaign'
-    id         = db.Column(db.Integer, primary_key=True)
-    name       = db.Column(db.String(200), nullable=False)
-    brand      = db.Column(db.String(100))
-    year       = db.Column(db.Integer)
-    month      = db.Column(db.Integer)
-    note       = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    id                 = db.Column(db.Integer, primary_key=True)
+    name               = db.Column(db.String(200), nullable=False)
+    brand              = db.Column(db.String(100))
+    year               = db.Column(db.Integer)
+    month              = db.Column(db.Integer)
+    note               = db.Column(db.Text)
+    cooperation_items  = db.Column(db.String(200))  # 勾選的合作項目，逗號分隔（如 "海報,立牌,派樣"）
+    cooperation_other  = db.Column(db.String(200))  # 其他合作項目，自由填寫
+    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class CampaignClinic(db.Model):
@@ -756,14 +758,16 @@ def get_campaigns():
     for c in campaigns:
         count = CampaignClinic.query.filter_by(campaign_id=c.id).count()
         result.append({
-            'id':           c.id,
-            'name':         c.name,
-            'brand':        c.brand or '',
-            'year':         c.year,
-            'month':        c.month,
-            'note':         c.note or '',
-            'clinic_count': count,
-            'created_at':   c.created_at.strftime('%Y-%m-%d') if c.created_at else '',
+            'id':                c.id,
+            'name':              c.name,
+            'brand':             c.brand or '',
+            'year':              c.year,
+            'month':             c.month,
+            'note':              c.note or '',
+            'cooperation_items': c.cooperation_items or '',
+            'cooperation_other': c.cooperation_other or '',
+            'clinic_count':      count,
+            'created_at':        c.created_at.strftime('%Y-%m-%d') if c.created_at else '',
         })
     return jsonify(result)
 
@@ -771,18 +775,22 @@ def get_campaigns():
 def create_campaign():
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    data  = request.get_json()
-    brand = (data.get('brand') or '').strip()
-    year  = data.get('year')
-    month = data.get('month')
-    note  = data.get('note') or ''
+    data              = request.get_json()
+    brand             = (data.get('brand') or '').strip()
+    year              = data.get('year')
+    month             = data.get('month')
+    note              = data.get('note') or ''
+    cooperation_items = (data.get('cooperation_items') or '').strip()
+    cooperation_other = (data.get('cooperation_other') or '').strip()
     name  = (data.get('name') or '').strip() or f"{brand}{year or ''}".strip()
     if not name:
         return jsonify({'error': '請輸入活動名稱或品牌'}), 400
     c = Campaign(name=name, brand=brand or None,
                  year=int(year) if year else None,
                  month=int(month) if month else None,
-                 note=note or None)
+                 note=note or None,
+                 cooperation_items=cooperation_items or None,
+                 cooperation_other=cooperation_other or None)
     db.session.add(c)
     db.session.commit()
     return jsonify({'success': True, 'id': c.id, 'name': c.name})
@@ -803,20 +811,24 @@ def update_campaign(campaign_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
     campaign = Campaign.query.get_or_404(campaign_id)
-    data  = request.get_json()
-    brand = (data.get('brand') or '').strip()
-    year  = data.get('year')
-    month = data.get('month')
-    note  = (data.get('note') or '').strip()
+    data              = request.get_json()
+    brand             = (data.get('brand') or '').strip()
+    year              = data.get('year')
+    month             = data.get('month')
+    note              = (data.get('note') or '').strip()
+    cooperation_items = (data.get('cooperation_items') or '').strip()
+    cooperation_other = (data.get('cooperation_other') or '').strip()
     # 年份和月份為必填
     if not year:
         return jsonify({'error': '年份為必填'}), 400
     if not month:
         return jsonify({'error': '月份為必填'}), 400
-    campaign.brand = brand or None
-    campaign.year  = int(year)
-    campaign.month = int(month)
-    campaign.note  = note or None
+    campaign.brand             = brand or None
+    campaign.year              = int(year)
+    campaign.month             = int(month)
+    campaign.note              = note or None
+    campaign.cooperation_items = cooperation_items or None
+    campaign.cooperation_other = cooperation_other or None
     db.session.commit()
     return jsonify({'success': True, 'id': campaign.id, 'name': campaign.name})
 
