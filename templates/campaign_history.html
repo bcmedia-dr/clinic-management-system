@@ -328,6 +328,18 @@
                 <input type="number" id="inputYear" placeholder="2025" min="2000" max="2099">
             </div>
             <div class="form-group">
+                <label>月份 <span style="color:#999;font-weight:400;">（選填）</span></label>
+                <select id="inputMonth">
+                    <option value="">不指定</option>
+                    <option value="1">1月</option><option value="2">2月</option>
+                    <option value="3">3月</option><option value="4">4月</option>
+                    <option value="5">5月</option><option value="6">6月</option>
+                    <option value="7">7月</option><option value="8">8月</option>
+                    <option value="9">9月</option><option value="10">10月</option>
+                    <option value="11">11月</option><option value="12">12月</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>活動名稱 <span style="color:#999;font-weight:400;">（留空則自動用「品牌+年份」）</span></label>
                 <input type="text" id="inputName" placeholder="留空則自動產生">
             </div>
@@ -367,6 +379,12 @@
         let currentCampaignId   = null;
         let currentCampaignName = '';
 
+        function fmtPeriod(year, month) {
+            if (year && month) return `${year}年${month}月`;
+            if (year) return `${year}年`;
+            return '-';
+        }
+
         document.addEventListener('DOMContentLoaded', loadCampaigns);
 
         // ── 活動列表 ─────────────────────────────────────────
@@ -384,7 +402,7 @@
                     <div class="campaign-item${c.id === currentCampaignId ? ' selected' : ''}"
                          id="campaign-item-${c.id}" onclick="selectCampaign(${c.id})">
                         <div class="campaign-item-name">${c.name}</div>
-                        <div class="campaign-item-meta">${c.brand || ''}${c.year ? '  ' + c.year : ''}</div>
+                        <div class="campaign-item-meta">${c.brand || ''}${c.brand && (c.year || c.month) ? '　' : ''}${fmtPeriod(c.year, c.month) !== '-' ? fmtPeriod(c.year, c.month) : ''}</div>
                         <div class="campaign-item-count">📍 ${c.clinic_count} 間診所</div>
                         <button class="btn-delete-campaign"
                             onclick="event.stopPropagation(); deleteCampaign(${c.id}, '${c.name.replace(/'/g,"\\'")}')">✕</button>
@@ -410,7 +428,7 @@
             currentCampaignName = campaign.name;
             document.getElementById('detailName').textContent  = campaign.name;
             document.getElementById('detailBrand').textContent = campaign.brand || '-';
-            document.getElementById('detailYear').textContent  = campaign.year  || '-';
+            document.getElementById('detailYear').textContent  = fmtPeriod(campaign.year, campaign.month);
             document.getElementById('detailCount').textContent = campaign.clinic_count;
             if (campaign.note) {
                 document.getElementById('detailNote').textContent = campaign.note;
@@ -495,6 +513,7 @@
         async function createCampaign() {
             const brand = document.getElementById('inputBrand').value.trim();
             const year  = document.getElementById('inputYear').value.trim();
+            const month = document.getElementById('inputMonth').value;
             const name  = document.getElementById('inputName').value.trim();
             const note  = document.getElementById('inputNote').value.trim();
             if (!brand && !name) { alert('請輸入品牌名稱或活動名稱'); return; }
@@ -502,13 +521,19 @@
                 const res = await fetch('/api/campaigns', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ brand, year: year ? parseInt(year) : null, name, note }),
+                    body: JSON.stringify({
+                        brand,
+                        year:  year  ? parseInt(year)  : null,
+                        month: month ? parseInt(month) : null,
+                        name, note,
+                    }),
                 });
                 const result = await res.json();
                 if (result.success) {
                     closeAddModal();
                     document.getElementById('inputBrand').value = '';
                     document.getElementById('inputYear').value  = '';
+                    document.getElementById('inputMonth').value = '';
                     document.getElementById('inputName').value  = '';
                     document.getElementById('inputNote').value  = '';
                     await loadCampaigns();

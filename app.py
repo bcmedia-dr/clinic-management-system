@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from datetime import datetime, date
 import os, re
 from collections import Counter
@@ -73,6 +74,7 @@ class Campaign(db.Model):
     name       = db.Column(db.String(200), nullable=False)
     brand      = db.Column(db.String(100))
     year       = db.Column(db.Integer)
+    month      = db.Column(db.Integer)
     note       = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -758,6 +760,7 @@ def get_campaigns():
             'name':         c.name,
             'brand':        c.brand or '',
             'year':         c.year,
+            'month':        c.month,
             'note':         c.note or '',
             'clinic_count': count,
             'created_at':   c.created_at.strftime('%Y-%m-%d') if c.created_at else '',
@@ -771,12 +774,15 @@ def create_campaign():
     data  = request.get_json()
     brand = (data.get('brand') or '').strip()
     year  = data.get('year')
+    month = data.get('month')
     note  = data.get('note') or ''
     name  = (data.get('name') or '').strip() or f"{brand}{year or ''}".strip()
     if not name:
         return jsonify({'error': '請輸入活動名稱或品牌'}), 400
     c = Campaign(name=name, brand=brand or None,
-                 year=int(year) if year else None, note=note or None)
+                 year=int(year) if year else None,
+                 month=int(month) if month else None,
+                 note=note or None)
     db.session.add(c)
     db.session.commit()
     return jsonify({'success': True, 'id': c.id, 'name': c.name})
@@ -1043,6 +1049,14 @@ def _hm_json(h):
 
 with app.app_context():
     db.create_all()
+    try:
+        with db.engine.connect() as _conn:
+            _conn.execute(text(
+                'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS month INTEGER'
+            ))
+            _conn.commit()
+    except Exception:
+        pass
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8081, debug=True)
