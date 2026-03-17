@@ -797,6 +797,29 @@ def delete_campaign(campaign_id):
     db.session.commit()
     return jsonify({'success': True})
 
+# 編輯活動資訊（品牌、年份、月份、備註）
+@app.route('/api/campaigns/<int:campaign_id>', methods=['PUT'])
+def update_campaign(campaign_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    campaign = Campaign.query.get_or_404(campaign_id)
+    data  = request.get_json()
+    brand = (data.get('brand') or '').strip()
+    year  = data.get('year')
+    month = data.get('month')
+    note  = (data.get('note') or '').strip()
+    # 年份和月份為必填
+    if not year:
+        return jsonify({'error': '年份為必填'}), 400
+    if not month:
+        return jsonify({'error': '月份為必填'}), 400
+    campaign.brand = brand or None
+    campaign.year  = int(year)
+    campaign.month = int(month)
+    campaign.note  = note or None
+    db.session.commit()
+    return jsonify({'success': True, 'id': campaign.id, 'name': campaign.name})
+
 @app.route('/api/campaigns/<int:campaign_id>/clinics', methods=['GET'])
 def get_campaign_clinics(campaign_id):
     Campaign.query.get_or_404(campaign_id)

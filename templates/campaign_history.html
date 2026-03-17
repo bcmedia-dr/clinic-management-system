@@ -97,6 +97,14 @@
             border-radius: 4px;
         }
         .btn-delete-campaign:hover { background: #fee2e2; color: #dc3545; }
+        /* 編輯按鈕：位置在刪除按鈕左側 */
+        .btn-edit-campaign {
+            position: absolute; top: 10px; right: 38px;
+            background: none; border: none; color: #ccc;
+            font-size: 14px; cursor: pointer; padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .btn-edit-campaign:hover { background: #e8f4fd; color: #2196f3; }
 
         /* ── Right Panel ── */
         .right-panel {
@@ -324,13 +332,13 @@
                 <input type="text" id="inputBrand" placeholder="舒跑">
             </div>
             <div class="form-group">
-                <label>年份</label>
+                <label>年份 <span style="color:#e96c2c;">*</span></label>
                 <input type="number" id="inputYear" placeholder="2025" min="2000" max="2099">
             </div>
             <div class="form-group">
-                <label>月份 <span style="color:#999;font-weight:400;">（選填）</span></label>
+                <label>月份 <span style="color:#e96c2c;">*</span></label>
                 <select id="inputMonth">
-                    <option value="">不指定</option>
+                    <option value="">請選擇月份</option>
                     <option value="1">1月</option><option value="2">2月</option>
                     <option value="3">3月</option><option value="4">4月</option>
                     <option value="5">5月</option><option value="6">6月</option>
@@ -347,7 +355,46 @@
                 <label>備註</label>
                 <textarea id="inputNote" rows="2" placeholder="選填"></textarea>
             </div>
+            <!-- 紅字驗證提示 -->
+            <div id="addFormError" style="color:#dc3545;font-size:13px;margin-bottom:12px;display:none;"></div>
             <button class="btn-submit" onclick="createCampaign()">新增活動</button>
+        </div>
+    </div>
+
+    <!-- 編輯活動 Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ 編輯活動</h2>
+                <button class="close-btn" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>品牌名稱</label>
+                <input type="text" id="editBrand" placeholder="例：舒跑">
+            </div>
+            <div class="form-group">
+                <label>年份 <span style="color:#e96c2c;">*</span></label>
+                <input type="number" id="editYear" placeholder="2025" min="2000" max="2099">
+            </div>
+            <div class="form-group">
+                <label>月份 <span style="color:#e96c2c;">*</span></label>
+                <select id="editMonth">
+                    <option value="">請選擇月份</option>
+                    <option value="1">1月</option><option value="2">2月</option>
+                    <option value="3">3月</option><option value="4">4月</option>
+                    <option value="5">5月</option><option value="6">6月</option>
+                    <option value="7">7月</option><option value="8">8月</option>
+                    <option value="9">9月</option><option value="10">10月</option>
+                    <option value="11">11月</option><option value="12">12月</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>備註</label>
+                <textarea id="editNote" rows="2" placeholder="選填"></textarea>
+            </div>
+            <!-- 紅字驗證提示 -->
+            <div id="editFormError" style="color:#dc3545;font-size:13px;margin-bottom:12px;display:none;"></div>
+            <button class="btn-submit" onclick="saveEditCampaign()">儲存變更</button>
         </div>
     </div>
 
@@ -378,6 +425,8 @@
     <script>
         let currentCampaignId   = null;
         let currentCampaignName = '';
+        let allCampaigns        = [];   // 儲存所有活動資料，供編輯 modal 使用
+        let editingCampaignId   = null; // 目前正在編輯的活動 ID
 
         function fmtPeriod(year, month) {
             if (year && month) return `${year}年${month}月`;
@@ -393,6 +442,7 @@
             try {
                 const res  = await fetch('/api/campaigns');
                 const list = await res.json();
+                allCampaigns = list; // 儲存供編輯 modal 使用
                 const div  = document.getElementById('campaignList');
                 if (list.length === 0) {
                     div.innerHTML = '<div style="text-align:center;padding:40px;color:#bbb;">尚無活動，點上方按鈕新增</div>';
@@ -404,6 +454,8 @@
                         <div class="campaign-item-name">${c.name}</div>
                         <div class="campaign-item-meta">${c.brand || ''}${c.brand && (c.year || c.month) ? '　' : ''}${fmtPeriod(c.year, c.month) !== '-' ? fmtPeriod(c.year, c.month) : ''}</div>
                         <div class="campaign-item-count">📍 ${c.clinic_count} 間診所</div>
+                        <button class="btn-edit-campaign"
+                            onclick="event.stopPropagation(); openEditModal(${c.id})">✎</button>
                         <button class="btn-delete-campaign"
                             onclick="event.stopPropagation(); deleteCampaign(${c.id}, '${c.name.replace(/'/g,"\\'")}')">✕</button>
                     </div>
@@ -508,23 +560,46 @@
         // ── 新增活動 Modal ────────────────────────────────────
 
         function showAddModal() { document.getElementById('addModal').style.display = 'block'; }
-        function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
+        function closeAddModal() {
+            document.getElementById('addModal').style.display = 'none';
+            document.getElementById('addFormError').style.display = 'none';
+        }
 
         async function createCampaign() {
-            const brand = document.getElementById('inputBrand').value.trim();
-            const year  = document.getElementById('inputYear').value.trim();
-            const month = document.getElementById('inputMonth').value;
-            const name  = document.getElementById('inputName').value.trim();
-            const note  = document.getElementById('inputNote').value.trim();
-            if (!brand && !name) { alert('請輸入品牌名稱或活動名稱'); return; }
+            const brand  = document.getElementById('inputBrand').value.trim();
+            const year   = document.getElementById('inputYear').value.trim();
+            const month  = document.getElementById('inputMonth').value;
+            const name   = document.getElementById('inputName').value.trim();
+            const note   = document.getElementById('inputNote').value.trim();
+            const errEl  = document.getElementById('addFormError');
+
+            // 必填驗證
+            if (!brand && !name) {
+                errEl.textContent = '請輸入品牌名稱或活動名稱';
+                errEl.style.display = 'block'; return;
+            }
+            if (!year && !month) {
+                errEl.textContent = '年份和月份為必填';
+                errEl.style.display = 'block'; return;
+            }
+            if (!year) {
+                errEl.textContent = '請輸入年份';
+                errEl.style.display = 'block'; return;
+            }
+            if (!month) {
+                errEl.textContent = '請選擇月份';
+                errEl.style.display = 'block'; return;
+            }
+            errEl.style.display = 'none';
+
             try {
                 const res = await fetch('/api/campaigns', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         brand,
-                        year:  year  ? parseInt(year)  : null,
-                        month: month ? parseInt(month) : null,
+                        year:  parseInt(year),
+                        month: parseInt(month),
                         name, note,
                     }),
                 });
@@ -539,9 +614,79 @@
                     await loadCampaigns();
                     selectCampaign(result.id);
                 } else {
-                    alert(result.error || '新增失敗');
+                    errEl.textContent = result.error || '新增失敗';
+                    errEl.style.display = 'block';
                 }
-            } catch(e) { alert('新增失敗：' + e.message); }
+            } catch(e) {
+                errEl.textContent = '新增失敗：' + e.message;
+                errEl.style.display = 'block';
+            }
+        }
+
+        // ── 編輯活動 Modal ────────────────────────────────────
+
+        function openEditModal(id) {
+            const c = allCampaigns.find(x => x.id === id);
+            if (!c) return;
+            editingCampaignId = id;
+            // 預填現有資料
+            document.getElementById('editBrand').value = c.brand || '';
+            document.getElementById('editYear').value  = c.year  || '';
+            document.getElementById('editMonth').value = c.month || '';
+            document.getElementById('editNote').value  = c.note  || '';
+            document.getElementById('editFormError').style.display = 'none';
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            editingCampaignId = null;
+        }
+
+        async function saveEditCampaign() {
+            const brand = document.getElementById('editBrand').value.trim();
+            const year  = document.getElementById('editYear').value.trim();
+            const month = document.getElementById('editMonth').value;
+            const note  = document.getElementById('editNote').value.trim();
+            const errEl = document.getElementById('editFormError');
+
+            // 必填驗證
+            if (!year && !month) {
+                errEl.textContent = '年份和月份為必填';
+                errEl.style.display = 'block'; return;
+            }
+            if (!year) {
+                errEl.textContent = '請輸入年份';
+                errEl.style.display = 'block'; return;
+            }
+            if (!month) {
+                errEl.textContent = '請選擇月份';
+                errEl.style.display = 'block'; return;
+            }
+            errEl.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/campaigns/${editingCampaignId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ brand, year: parseInt(year), month: parseInt(month), note }),
+                });
+                const result = await res.json();
+                if (result.success) {
+                    closeEditModal();
+                    await loadCampaigns();
+                    // 若目前正在查看這個活動，重新載入詳細資料
+                    if (currentCampaignId === editingCampaignId || currentCampaignId === result.id) {
+                        selectCampaign(result.id);
+                    }
+                } else {
+                    errEl.textContent = result.error || '儲存失敗';
+                    errEl.style.display = 'block';
+                }
+            } catch(e) {
+                errEl.textContent = '儲存失敗：' + e.message;
+                errEl.style.display = 'block';
+            }
         }
 
         // ── 匯入 Modal ───────────────────────────────────────
@@ -592,6 +737,7 @@
         window.onclick = function(e) {
             if (e.target === document.getElementById('addModal'))    closeAddModal();
             if (e.target === document.getElementById('importModal')) closeImportModal();
+            if (e.target === document.getElementById('editModal'))   closeEditModal();
         };
     </script>
 </body>
