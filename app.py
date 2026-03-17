@@ -840,8 +840,28 @@ def import_campaign_clinics(campaign_id):
         ws = wb.active
         os.remove(temp_path)
 
-        header = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
-        col    = {name: idx for idx, name in enumerate(header)}
+        # 前三行 debug 資訊
+        preview_rows = []
+        for r in ws.iter_rows(min_row=1, max_row=3, values_only=True):
+            preview_rows.append([str(v) if v is not None else '' for v in r])
+
+        # 自動偵測 header 行：掃描前 5 行，找到含「電話」的那行
+        header_row_idx = None
+        header = []
+        for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=5, values_only=True), start=1):
+            stripped = [str(v).strip() if v is not None else '' for v in row]
+            if '電話' in stripped:
+                header_row_idx = row_idx
+                header = stripped
+                break
+
+        if header_row_idx is None:
+            return jsonify({
+                'error': '找不到含「電話」的標題行（掃描前 5 行）',
+                'debug_preview': preview_rows,
+            }), 400
+
+        col = {name: idx for idx, name in enumerate(header)}
 
         # 支援雙名稱欄位
         def _resolve(row, *candidates):
@@ -850,9 +870,6 @@ def import_campaign_clinics(campaign_id):
                 if idx is not None and idx < len(row) and row[idx] is not None:
                     return str(row[idx]).strip()
             return ''
-
-        if '電話' not in col:
-            return jsonify({'error': 'Excel 缺少必要欄位：電話'}), 400
 
         phone_to_clinic = {}
         for c in Clinic.query.all():
@@ -866,7 +883,8 @@ def import_campaign_clinics(campaign_id):
         new_clinics_count = already_exists = recorded = already_in_campaign = 0
         errors = []
 
-        for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        data_start_row = header_row_idx + 1
+        for row_num, row in enumerate(ws.iter_rows(min_row=data_start_row, values_only=True), start=data_start_row):
             if not any(row):
                 continue
             phone_raw  = _resolve(row, '電話')
@@ -913,12 +931,15 @@ def import_campaign_clinics(campaign_id):
 
         db.session.commit()
         return jsonify({
-            'success':            True,
-            'new_clinics':        new_clinics_count,
-            'already_exists':     already_exists,
-            'recorded':           recorded,
+            'success':             True,
+            'new_clinics':         new_clinics_count,
+            'already_exists':      already_exists,
+            'recorded':            recorded,
             'already_in_campaign': already_in_campaign,
-            'errors':             errors,
+            'errors':              errors,
+            'debug_header_row':    header_row_idx,
+            'debug_columns':       header,
+            'debug_preview':       preview_rows,
         })
 
     except Exception as e:
