@@ -1275,16 +1275,17 @@ def export_baiwei():
     specialty = request.args.get('specialty', '')
     query = BaiweiDoctor.query
     if specialty:
-        query = query.filter(BaiweiDoctor.specialty == specialty)
+        # 與列表 API 一致，用 LIKE 比對複合科別欄位（如「家醫科/外科」）
+        query = query.filter(BaiweiDoctor.specialty.like(f'%{specialty}%'))
     items = query.order_by(BaiweiDoctor.region, BaiweiDoctor.district, BaiweiDoctor.clinic_name).all()
 
     wb = Workbook()
     ws = wb.active
     ws.title = '百位醫師'
-    headers = ['縣市', '區域', '診所名稱', '地址', '電話', '醫師名字', '科別']
+    headers = ['縣市', '區域', '診所名稱', '醫師名字', '科別', '電話']
     ws.append(headers)
 
-    fill = PatternFill(start_color='7B2FBE', end_color='7B2FBE', fill_type='solid')
+    fill = PatternFill(start_color='667EEA', end_color='667EEA', fill_type='solid')
     for i in range(1, len(headers) + 1):
         cell = ws.cell(row=1, column=i)
         cell.font = Font(bold=True, color='FFFFFF')
@@ -1293,9 +1294,9 @@ def export_baiwei():
 
     for d in items:
         ws.append([d.region or '', d.district or '', d.clinic_name or '',
-                   d.address or '', d.phone or '', d.doctor_name or '', d.specialty or ''])
+                   d.doctor_name or '', d.specialty or '', d.phone or ''])
 
-    for i, w in enumerate([10, 10, 22, 32, 15, 12, 14], 1):
+    for i, w in enumerate([10, 10, 24, 14, 16, 14], 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 
     output = BytesIO()
