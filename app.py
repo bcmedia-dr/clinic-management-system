@@ -1083,7 +1083,8 @@ def get_baiwei():
     specialty = request.args.get('specialty', '')
     query = BaiweiDoctor.query
     if specialty:
-        query = query.filter(BaiweiDoctor.specialty == specialty)
+        # 用 LIKE 比對，支援「家醫科/外科」這類複合科別欄位
+        query = query.filter(BaiweiDoctor.specialty.like(f'%{specialty}%'))
     items = query.order_by(BaiweiDoctor.region, BaiweiDoctor.district, BaiweiDoctor.clinic_name).all()
     return jsonify([{
         'id':          i.id,
@@ -1100,10 +1101,26 @@ def get_baiwei():
 
 @app.route('/api/baiwei/stats', methods=['GET'])
 def get_baiwei_stats():
-    items = BaiweiDoctor.query.all()
-    total = len(items)
-    specialty_count = Counter(i.specialty for i in items if i.specialty)
-    return jsonify({'total': total, 'by_specialty': dict(specialty_count)})
+    total = BaiweiDoctor.query.count()
+    return jsonify({'total': total})
+
+
+@app.route('/api/baiwei/specialties', methods=['GET'])
+def get_baiwei_specialties():
+    """
+    從 baiwei_doctor 的 specialty 欄位動態產生科別選單。
+    以斜線拆分複合科別（如「家醫科/外科」→「家醫科」、「外科」），
+    去重後排序，並排除指定科別。
+    """
+    EXCLUDE = {'泌尿科', '牙科', '產後護理之家', '醫美'}
+    rows = db.session.query(BaiweiDoctor.specialty).filter(BaiweiDoctor.specialty.isnot(None)).all()
+    seen = set()
+    for (val,) in rows:
+        for part in val.split('/'):
+            part = part.strip()
+            if part and part not in EXCLUDE:
+                seen.add(part)
+    return jsonify(sorted(seen))
 
 
 @app.route('/api/baiwei/import', methods=['POST'])

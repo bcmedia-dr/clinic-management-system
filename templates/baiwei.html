@@ -167,19 +167,6 @@
     <div class="toolbar">
         <select class="filter-select" id="filterSpecialty" onchange="applyFilter()">
             <option value="">全部科別</option>
-            <option value="小兒科">小兒科</option>
-            <option value="家醫科">家醫科</option>
-            <option value="耳鼻喉科">耳鼻喉科</option>
-            <option value="內科">內科</option>
-            <option value="外科">外科</option>
-            <option value="醫美">醫美</option>
-            <option value="皮膚科">皮膚科</option>
-            <option value="婦產科">婦產科</option>
-            <option value="泌尿科">泌尿科</option>
-            <option value="復健/骨科">復健/骨科</option>
-            <option value="牙科">牙科</option>
-            <option value="中醫">中醫</option>
-            <option value="產後護理之家">產後護理之家</option>
         </select>
         <span class="total-count" id="totalCount"></span>
         <div class="spacer"></div>
@@ -233,6 +220,19 @@
 <script>
 let allData = [];
 
+// 動態載入科別選單（從資料庫拆分、去重後的結果）
+async function loadSpecialties() {
+    const res = await fetch('/api/baiwei/specialties');
+    const specialties = await res.json();
+    const sel = document.getElementById('filterSpecialty');
+    specialties.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        sel.appendChild(opt);
+    });
+}
+
 async function loadData() {
     const specialty = document.getElementById('filterSpecialty').value;
     const url = specialty ? `/api/baiwei?specialty=${encodeURIComponent(specialty)}` : '/api/baiwei';
@@ -249,8 +249,8 @@ async function updateStats() {
 
     const specialty = document.getElementById('filterSpecialty').value;
     if (specialty) {
-        const cnt = (stats.by_specialty || {})[specialty] || 0;
-        document.getElementById('statSpecialty').textContent = cnt;
+        // 已篩選的 allData 即為該科別的結果（LIKE 比對），直接取筆數
+        document.getElementById('statSpecialty').textContent = allData.length;
     } else {
         document.getElementById('statSpecialty').textContent = '-';
     }
@@ -349,7 +349,8 @@ document.getElementById('importModal').addEventListener('click', function(e) {
     if (e.target === this) closeImportModal();
 });
 
-loadData();
+// 先載入科別選單，再載入資料
+loadSpecialties().then(() => loadData());
 </script>
 </body>
 </html>
