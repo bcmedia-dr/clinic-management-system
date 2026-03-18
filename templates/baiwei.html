@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百位 - Bcmedia 診所管理系統</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #7b2fbe 0%, #a855f7 100%);
+            color: white; padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo { font-size: 32px; }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .nav { display: flex; gap: 10px; margin-top: 15px; }
+        .nav-btn {
+            background: rgba(255,255,255,0.2); color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px; border-radius: 8px;
+            text-decoration: none; font-size: 14px;
+            transition: all 0.3s; display: inline-block;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.3); }
+        .nav-btn.active { background: white; color: #7b2fbe; border-color: white; }
+        .btn-logout {
+            background: rgba(255,255,255,0.2); color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+        /* ── Main ── */
+        .main { padding: 30px 40px; }
+
+        /* ── Dashboard ── */
+        .dashboard { display: flex; gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            background: white; border-radius: 12px;
+            padding: 20px 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            min-width: 160px;
+        }
+        .stat-card .label { font-size: 13px; color: #888; margin-bottom: 6px; }
+        .stat-card .value { font-size: 32px; font-weight: 700; color: #7b2fbe; }
+        .stat-card.secondary .value { font-size: 28px; color: #555; }
+
+        /* ── Toolbar ── */
+        .toolbar {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 18px;
+        }
+        .filter-select {
+            padding: 8px 14px; border: 1px solid #ddd; border-radius: 8px;
+            font-size: 14px; background: white; min-width: 150px;
+        }
+        .total-count { color: #888; font-size: 14px; margin-left: 4px; }
+        .btn-action {
+            padding: 9px 20px; border: none; border-radius: 8px;
+            font-size: 14px; cursor: pointer; font-weight: 500; transition: opacity 0.2s;
+        }
+        .btn-action:hover { opacity: 0.85; }
+        .btn-import { background: #7b2fbe; color: white; }
+        .btn-export { background: #f0e6ff; color: #7b2fbe; border: 1px solid #c4b5fd; }
+        .spacer { flex: 1; }
+
+        /* ── Table ── */
+        .table-wrapper {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            background: #7b2fbe; color: white;
+            padding: 12px 16px; font-size: 13px; text-align: left; font-weight: 600;
+        }
+        tbody tr { border-bottom: 1px solid #f0f0f0; }
+        tbody tr:hover { background: #faf5ff; }
+        tbody td { padding: 12px 16px; font-size: 14px; }
+        .no-data { text-align: center; padding: 60px; color: #bbb; font-size: 15px; }
+
+        .btn-delete {
+            background: none; border: 1px solid #fca5a5; color: #ef4444;
+            padding: 4px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+        }
+        .btn-delete:hover { background: #fef2f2; }
+
+        /* ── Modal ── */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: white; border-radius: 16px;
+            padding: 32px; width: 480px; max-width: 95vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-header h2 { font-size: 20px; font-weight: 700; }
+        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #888; }
+        .close-btn:hover { color: #333; }
+        .format-hint {
+            background: #f5f3ff; border: 1px solid #e9d5ff;
+            border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;
+            font-size: 13px; color: #555; line-height: 1.8;
+        }
+        .format-hint strong { color: #7b2fbe; }
+        .file-input-wrap { margin-bottom: 20px; }
+        .file-input-wrap label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+        .file-input-wrap input[type=file] {
+            width: 100%; padding: 10px; border: 1px dashed #c4b5fd;
+            border-radius: 8px; font-size: 14px; background: #faf5ff;
+        }
+        .btn-submit {
+            width: 100%; padding: 12px; background: #7b2fbe; color: white;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
+        }
+        .btn-submit:hover { background: #6d28d9; }
+        .btn-submit:disabled { background: #c4b5fd; cursor: not-allowed; }
+        .import-result {
+            margin-top: 16px; padding: 14px; border-radius: 8px;
+            font-size: 14px; line-height: 1.8; display: none;
+        }
+        .import-result.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+        .import-result.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-top">
+        <div class="header-left">
+            <div class="logo">🏅</div>
+            <h1>百位醫師管理</h1>
+        </div>
+        <div class="header-right">
+            <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+        </div>
+    </div>
+    <div class="nav">
+        <a href="/" class="nav-btn">📋 診所管理</a>
+        <a href="/health-mall" class="nav-btn">🏪 健康醫購</a>
+        <a href="/campaign-match" class="nav-btn">🎯 活動比對</a>
+        <a href="/campaign-history" class="nav-btn">📅 活動記錄</a>
+        <a href="/baiwei" class="nav-btn active">🏅 百位</a>
+        <a href="/analytics" class="nav-btn">📊 統計分析</a>
+    </div>
+</div>
+
+<div class="main">
+    <!-- 儀表板 -->
+    <div class="dashboard">
+        <div class="stat-card">
+            <div class="label">總醫師數</div>
+            <div class="value" id="statTotal">-</div>
+        </div>
+        <div class="stat-card secondary">
+            <div class="label">篩選科別人數</div>
+            <div class="value" id="statSpecialty">-</div>
+        </div>
+    </div>
+
+    <!-- 工具列 -->
+    <div class="toolbar">
+        <select class="filter-select" id="filterSpecialty" onchange="applyFilter()">
+            <option value="">全部科別</option>
+            <option value="小兒科">小兒科</option>
+            <option value="家醫科">家醫科</option>
+            <option value="耳鼻喉科">耳鼻喉科</option>
+            <option value="內科">內科</option>
+            <option value="外科">外科</option>
+            <option value="醫美">醫美</option>
+            <option value="皮膚科">皮膚科</option>
+            <option value="婦產科">婦產科</option>
+            <option value="泌尿科">泌尿科</option>
+            <option value="復健/骨科">復健/骨科</option>
+            <option value="牙科">牙科</option>
+            <option value="中醫">中醫</option>
+            <option value="產後護理之家">產後護理之家</option>
+        </select>
+        <span class="total-count" id="totalCount"></span>
+        <div class="spacer"></div>
+        <button class="btn-action btn-export" onclick="exportExcel()">📥 匯出名單</button>
+        <button class="btn-action btn-import" onclick="showImportModal()">📤 匯入 Excel</button>
+    </div>
+
+    <!-- 表格 -->
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>編號</th>
+                    <th>縣市</th>
+                    <th>區域</th>
+                    <th>診所名稱</th>
+                    <th>醫師名字</th>
+                    <th>科別</th>
+                    <th>電話</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="baiweiTable">
+                <tr><td colspan="8" class="no-data">載入中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 匯入 Modal -->
+<div class="modal" id="importModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>📤 匯入百位醫師</h2>
+            <button class="close-btn" onclick="closeImportModal()">&times;</button>
+        </div>
+        <div class="format-hint">
+            <strong>Excel 欄位格式：</strong><br>
+            縣市 ／ 區域 ／ 診所名稱 ／ 地址 ／ 電話 ／ 醫師 ／ 科別<br>
+            <span style="color:#888;font-size:12px;">以電話比對診所總表，無則自動新增；同電話＋同醫師名字視為重複跳過</span>
+        </div>
+        <div class="file-input-wrap">
+            <label>選擇 Excel 檔案（.xlsx）</label>
+            <input type="file" id="importFile" accept=".xlsx">
+        </div>
+        <button class="btn-submit" id="importBtn" onclick="doImport()">開始匯入</button>
+        <div class="import-result" id="importResult"></div>
+    </div>
+</div>
+
+<script>
+let allData = [];
+
+async function loadData() {
+    const specialty = document.getElementById('filterSpecialty').value;
+    const url = specialty ? `/api/baiwei?specialty=${encodeURIComponent(specialty)}` : '/api/baiwei';
+    const res = await fetch(url);
+    allData = await res.json();
+    renderTable(allData);
+    updateStats();
+}
+
+async function updateStats() {
+    const res = await fetch('/api/baiwei/stats');
+    const stats = await res.json();
+    document.getElementById('statTotal').textContent = stats.total;
+
+    const specialty = document.getElementById('filterSpecialty').value;
+    if (specialty) {
+        const cnt = (stats.by_specialty || {})[specialty] || 0;
+        document.getElementById('statSpecialty').textContent = cnt;
+    } else {
+        document.getElementById('statSpecialty').textContent = '-';
+    }
+}
+
+function renderTable(data) {
+    const tbody = document.getElementById('baiweiTable');
+    document.getElementById('totalCount').textContent = `共 ${data.length} 筆`;
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">目前沒有資料</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map((d, i) => `
+        <tr>
+            <td style="color:#aaa;font-size:12px;">${i + 1}</td>
+            <td>${d.region}</td>
+            <td>${d.district}</td>
+            <td>${d.clinic_name}</td>
+            <td><strong>${d.doctor_name}</strong></td>
+            <td>${d.specialty || '-'}</td>
+            <td>${d.phone}</td>
+            <td><button class="btn-delete" onclick="deleteDoctor(${d.id}, '${d.doctor_name.replace(/'/g, "\\'")}')">刪除</button></td>
+        </tr>
+    `).join('');
+}
+
+function applyFilter() {
+    loadData();
+}
+
+async function deleteDoctor(id, name) {
+    if (!confirm(`確定刪除醫師「${name}」？`)) return;
+    const res = await fetch(`/api/baiwei/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+        loadData();
+    } else {
+        alert('刪除失敗：' + (data.error || '未知錯誤'));
+    }
+}
+
+function exportExcel() {
+    const specialty = document.getElementById('filterSpecialty').value;
+    const url = specialty ? `/api/baiwei/export?specialty=${encodeURIComponent(specialty)}` : '/api/baiwei/export';
+    window.location.href = url;
+}
+
+function showImportModal() {
+    document.getElementById('importModal').classList.add('show');
+    document.getElementById('importResult').style.display = 'none';
+    document.getElementById('importFile').value = '';
+    document.getElementById('importBtn').disabled = false;
+}
+
+function closeImportModal() {
+    document.getElementById('importModal').classList.remove('show');
+}
+
+async function doImport() {
+    const file = document.getElementById('importFile').files[0];
+    if (!file) { alert('請選擇檔案'); return; }
+
+    const btn = document.getElementById('importBtn');
+    btn.disabled = true;
+    btn.textContent = '匯入中...';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    const res = await fetch('/api/baiwei/import', { method: 'POST', body: form });
+    const data = await res.json();
+
+    const resultEl = document.getElementById('importResult');
+    resultEl.style.display = 'block';
+
+    if (data.success) {
+        resultEl.className = 'import-result success';
+        let html = `✅ 匯入完成：新增 <strong>${data.new}</strong> 筆，已存在跳過 <strong>${data.already_exists}</strong> 筆`;
+        if (data.errors && data.errors.length > 0) {
+            html += `<br><br>⚠️ 以下列有問題：<br>${data.errors.slice(0, 5).join('<br>')}`;
+            if (data.errors.length > 5) html += `<br>...（共 ${data.errors.length} 筆錯誤）`;
+        }
+        resultEl.innerHTML = html;
+        loadData();
+    } else {
+        resultEl.className = 'import-result error';
+        resultEl.textContent = '❌ ' + (data.error || '匯入失敗');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '開始匯入';
+}
+
+// 點擊 modal 外部關閉
+document.getElementById('importModal').addEventListener('click', function(e) {
+    if (e.target === this) closeImportModal();
+});
+
+loadData();
+</script>
+</body>
+</html>

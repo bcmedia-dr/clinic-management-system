@@ -93,6 +93,22 @@ class CampaignClinic(db.Model):
     clinic   = db.relationship('Clinic',   backref=db.backref('campaign_links', lazy=True))
 
 
+class BaiweiDoctor(db.Model):
+    __tablename__ = 'baiwei_doctor'
+    id          = db.Column(db.Integer, primary_key=True)
+    clinic_id   = db.Column(db.Integer, db.ForeignKey('clinic.id', ondelete='SET NULL'), nullable=True)
+    clinic_name = db.Column(db.String(200))
+    region      = db.Column(db.String(50))
+    district    = db.Column(db.String(50))
+    address     = db.Column(db.String(300))
+    phone       = db.Column(db.String(50))
+    doctor_name = db.Column(db.String(100))
+    specialty   = db.Column(db.String(200))
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    clinic = db.relationship('Clinic', backref=db.backref('baiwei_doctors', lazy=True))
+
+
 # ── 頁面路由 ────────────────────────────────────────────────
 
 @app.route('/')
@@ -118,6 +134,12 @@ def campaign_history_page():
     if 'user' not in session:
         return redirect(url_for('login'))
     return render_template('campaign_history.html')
+
+@app.route('/baiwei')
+def baiwei_page():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('baiwei.html')
 
 @app.route('/campaign-match')
 def campaign_match_page():
@@ -865,7 +887,7 @@ def get_campaign_clinics(campaign_id):
 def import_campaign_clinics(campaign_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    Campaign.query.get_or_404(campaign_id)
+    campaign = Campaign.query.get_or_404(campaign_id)
     if 'file' not in request.files:
         return jsonify({'error': '沒有上傳檔案'}), 400
     file = request.files['file']
@@ -923,6 +945,7 @@ def import_campaign_clinics(campaign_id):
 
         new_clinics_count = already_exists = recorded = already_in_campaign = 0
         errors = []
+        processed_clinics = []  # 記錄本次處理過的診所，匯入後連動合作項目
 
         data_start_row = header_row_idx + 1
         for row_num, row in enumerate(ws.iter_rows(min_row=data_start_row, values_only=True), start=data_start_row):
@@ -963,12 +986,26 @@ def import_campaign_clinics(campaign_id):
                 phone_to_clinic[normalized] = clinic
                 new_clinics_count += 1
 
+            processed_clinics.append(clinic)
             if clinic.id in in_campaign:
                 already_in_campaign += 1
                 continue
             db.session.add(CampaignClinic(campaign_id=campaign_id, clinic_id=clinic.id))
             in_campaign.add(clinic.id)
             recorded += 1
+
+        # 根據活動的合作項目，連動更新所有處理過的診所欄位（只設 True，不取消）
+        coop_items = campaign.cooperation_items or ''
+        if coop_items and processed_clinics:
+            for c in processed_clinics:
+                if '藥袋' in coop_items:
+                    c.col_yaodai = True
+                if '海報' in coop_items or '立牌' in coop_items:
+                    c.col_haibao = True
+                if '派樣' in coop_items:
+                    c.col_paiyang = True
+                if '百位' in coop_items:
+                    c.col_baiwei = True
 
         db.session.commit()
         return jsonify({
@@ -1039,6 +1076,219 @@ def get_clinic_campaigns(clinic_id):
     return jsonify(result)
 
 
+# ── 百位醫師 API ──────────────────────────────────────────────
+
+@app.route('/api/baiwei', methods=['GET'])
+def get_baiwei():
+    specialty = request.args.get('specialty', '')
+    query = BaiweiDoctor.query
+    if specialty:
+        query = query.filter(BaiweiDoctor.specialty == specialty)
+    items = query.order_by(BaiweiDoctor.region, BaiweiDoctor.district, BaiweiDoctor.clinic_name).all()
+    return jsonify([{
+        'id':          i.id,
+        'clinic_id':   i.clinic_id,
+        'clinic_name': i.clinic_name or '',
+        'region':      i.region or '',
+        'district':    i.district or '',
+        'address':     i.address or '',
+        'phone':       i.phone or '',
+        'doctor_name': i.doctor_name or '',
+        'specialty':   i.specialty or '',
+    } for i in items])
+
+
+@app.route('/api/baiwei/stats', methods=['GET'])
+def get_baiwei_stats():
+    items = BaiweiDoctor.query.all()
+    total = len(items)
+    specialty_count = Counter(i.specialty for i in items if i.specialty)
+    return jsonify({'total': total, 'by_specialty': dict(specialty_count)})
+
+
+@app.route('/api/baiwei/import', methods=['POST'])
+def import_baiwei():
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    if 'file' not in request.files:
+        return jsonify({'error': '沒有上傳檔案'}), 400
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': '只接受 .xlsx 格式'}), 400
+
+    filename  = secure_filename(file.filename)
+    temp_path = os.path.join('/tmp', filename)
+    file.save(temp_path)
+
+    try:
+        wb = load_workbook(temp_path)
+        ws = wb.active
+        os.remove(temp_path)
+
+        # 偵測 header 行（找含「電話」的那行）
+        header_row_idx = None
+        header = []
+        for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=5, values_only=True), start=1):
+            stripped = [str(v).strip() if v is not None else '' for v in row]
+            if '電話' in stripped:
+                header_row_idx = row_idx
+                header = stripped
+                break
+        if header_row_idx is None:
+            return jsonify({'error': '找不到含「電話」的標題行（掃描前 5 行）'}), 400
+
+        col = {name: idx for idx, name in enumerate(header)}
+
+        def _get(row, *keys):
+            for k in keys:
+                idx = col.get(k)
+                if idx is not None and idx < len(row) and row[idx] is not None:
+                    return str(row[idx]).strip()
+            return ''
+
+        # 建立電話 → clinic 的快查表
+        phone_to_clinic = {}
+        for c in Clinic.query.all():
+            np = _normalize_phone(c.phone)
+            if np:
+                phone_to_clinic[np] = c
+
+        # 建立已存在的百位醫師組合（phone + doctor_name）防重複匯入
+        existing_keys = {
+            (_normalize_phone(d.phone), (d.doctor_name or '').strip())
+            for d in BaiweiDoctor.query.all()
+        }
+
+        new_count = already_count = 0
+        errors = []
+
+        for row_num, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True), start=header_row_idx + 1):
+            if not any(row):
+                continue
+
+            phone_raw   = _get(row, '電話')
+            doctor_name = _get(row, '醫師', '醫師名字')
+            normalized  = _normalize_phone(phone_raw)
+
+            if not normalized:
+                errors.append(f'第{row_num}列：缺少電話')
+                continue
+            if not doctor_name:
+                errors.append(f'第{row_num}列：缺少醫師名字')
+                continue
+
+            # 重複檢查
+            if (normalized, doctor_name) in existing_keys:
+                already_count += 1
+                continue
+
+            # 比對或新增診所
+            clinic = phone_to_clinic.get(normalized)
+            if clinic is None:
+                raw_name = _get(row, '診所名稱', '院名')
+                if not raw_name:
+                    errors.append(f'第{row_num}列：總表無此電話且缺少診所名稱')
+                    continue
+                from import_custom import _parse_name
+                name, extracted_note = _parse_name(raw_name)
+                if not name:
+                    errors.append(f'第{row_num}列：診所名稱清理後為空（原始：{raw_name}）')
+                    continue
+                clinic = Clinic(
+                    region   =_get(row, '縣市') or None,
+                    district =_get(row, '區域') or None,
+                    name     =name,
+                    address  =_get(row, '地址') or None,
+                    phone    =phone_raw,
+                    note     =extracted_note or None,
+                )
+                db.session.add(clinic)
+                db.session.flush()
+                phone_to_clinic[normalized] = clinic
+
+            # 設定 col_baiwei
+            clinic.col_baiwei = True
+
+            doc = BaiweiDoctor(
+                clinic_id   =clinic.id,
+                clinic_name =_get(row, '診所名稱', '院名') or clinic.name,
+                region      =_get(row, '縣市') or clinic.region,
+                district    =_get(row, '區域') or clinic.district,
+                address     =_get(row, '地址') or clinic.address,
+                phone       =phone_raw,
+                doctor_name =doctor_name,
+                specialty   =_get(row, '科別') or None,
+            )
+            db.session.add(doc)
+            existing_keys.add((normalized, doctor_name))
+            new_count += 1
+
+        db.session.commit()
+        return jsonify({'success': True, 'new': new_count, 'already_exists': already_count, 'errors': errors})
+
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        db.session.rollback()
+        return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
+
+
+@app.route('/api/baiwei/<int:doc_id>', methods=['DELETE'])
+def delete_baiwei(doc_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    doc = BaiweiDoctor.query.get_or_404(doc_id)
+    clinic_id = doc.clinic_id
+    db.session.delete(doc)
+    db.session.flush()
+    # 若該診所已無其他百位醫師記錄，將 col_baiwei 設回 False
+    if clinic_id:
+        remaining = BaiweiDoctor.query.filter_by(clinic_id=clinic_id).count()
+        if remaining == 0:
+            clinic = Clinic.query.get(clinic_id)
+            if clinic:
+                clinic.col_baiwei = False
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/baiwei/export', methods=['GET'])
+def export_baiwei():
+    specialty = request.args.get('specialty', '')
+    query = BaiweiDoctor.query
+    if specialty:
+        query = query.filter(BaiweiDoctor.specialty == specialty)
+    items = query.order_by(BaiweiDoctor.region, BaiweiDoctor.district, BaiweiDoctor.clinic_name).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '百位醫師'
+    headers = ['縣市', '區域', '診所名稱', '地址', '電話', '醫師名字', '科別']
+    ws.append(headers)
+
+    fill = PatternFill(start_color='7B2FBE', end_color='7B2FBE', fill_type='solid')
+    for i in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=i)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = fill
+        cell.alignment = Alignment(horizontal='center')
+
+    for d in items:
+        ws.append([d.region or '', d.district or '', d.clinic_name or '',
+                   d.address or '', d.phone or '', d.doctor_name or '', d.specialty or ''])
+
+    for i, w in enumerate([10, 10, 22, 32, 15, 12, 14], 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    filename = f'百位醫師_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    return send_file(output,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+
 # ── 工具函式 ─────────────────────────────────────────────────
 
 def _normalize_phone(phone):
@@ -1089,6 +1339,18 @@ with app.app_context():
         'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS month INTEGER',
         'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS cooperation_items VARCHAR(200)',
         'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS cooperation_other VARCHAR(200)',
+        """CREATE TABLE IF NOT EXISTS baiwei_doctor (
+            id SERIAL PRIMARY KEY,
+            clinic_id INTEGER REFERENCES clinic(id) ON DELETE SET NULL,
+            clinic_name VARCHAR(200),
+            region VARCHAR(50),
+            district VARCHAR(50),
+            address VARCHAR(300),
+            phone VARCHAR(50),
+            doctor_name VARCHAR(100),
+            specialty VARCHAR(200),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
     for _sql in _migrations:
         try:
