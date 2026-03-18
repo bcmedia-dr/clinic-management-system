@@ -1116,7 +1116,8 @@ def get_baiwei_specialties():
     rows = db.session.query(BaiweiDoctor.specialty).filter(BaiweiDoctor.specialty.isnot(None)).all()
     seen = set()
     for (val,) in rows:
-        for part in val.split('/'):
+        # 同時支援斜線、頓號、逗號三種分隔符號
+        for part in re.split(r'[/、,]', val):
             part = part.strip()
             if part and part not in EXCLUDE:
                 seen.add(part)
