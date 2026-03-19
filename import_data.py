@@ -21,16 +21,14 @@ def import_clinics(file_path, db, Clinic):
         if actual_headers[:7] != expected_headers:
             return {'success': False, 'error': '檔案格式錯誤：標題列不符合要求'}
 
-        # 建立現有電話號碼集合
-        existing_phones = set()
-        for (phone,) in Clinic.query.with_entities(Clinic.phone).all():
-            np = _normalize_phone(phone)
-            if np:
-                existing_phones.add(np)
+        # 建立現有電話 → 診所物件對應表（用 phone_normalized 為鍵，方便查詢與更新）
+        phone_to_existing = {}
+        for c in Clinic.query.all():
+            if c.phone_normalized:
+                phone_to_existing[c.phone_normalized] = c
 
         imported_count = 0
-        skipped_count = 0
-        skipped_names = []
+        updated_count  = 0
         errors = []
 
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -52,12 +50,19 @@ def import_clinics(file_path, db, Clinic):
 
                 phone_str  = str(phone) if phone else ''
                 region_str = str(region).strip() if region else None
-                phone_fmt  = format_phone(phone_str, region_str)           # 先補區碼
-                normalized = _normalize_phone(phone_fmt)                    # 再正規化（含區碼的完整數字）
+                phone_fmt  = format_phone(phone_str, region_str)   # 先補區碼
+                normalized = _normalize_phone(phone_fmt)            # 再正規化（含區碼的完整數字）
 
-                if normalized and normalized in existing_phones:
-                    skipped_count += 1
-                    skipped_names.append(str(name))
+                if normalized and normalized in phone_to_existing:
+                    # 電話已存在 → 更新現有診所資料（phone / phone_normalized 不動）
+                    existing = phone_to_existing[normalized]
+                    existing.region         = region
+                    existing.district       = district
+                    existing.name           = name
+                    existing.specialties    = normalize_specialty(str(specialties) if specialties else '') or None
+                    existing.address        = address
+                    existing.contact_person = contact_person
+                    updated_count += 1
                     continue
 
                 clinic = Clinic(
@@ -76,12 +81,23 @@ def import_clinics(file_path, db, Clinic):
                     db.session.add(clinic)
                     db.session.flush()
                     if normalized:
-                        existing_phones.add(normalized)
+                        phone_to_existing[normalized] = clinic
                     imported_count += 1
                 except IntegrityError:
-                    sp.rollback()  # 回滾到 savepoint，其餘已成功筆數不受影響
-                    skipped_count += 1
-                    skipped_names.append(str(name))
+                    # 並發情況：INSERT 失敗但 phone_to_existing 未命中，改為更新
+                    sp.rollback()
+                    existing = Clinic.query.filter_by(phone_normalized=normalized).first()
+                    if existing:
+                        existing.region         = region
+                        existing.district       = district
+                        existing.name           = name
+                        existing.specialties    = normalize_specialty(str(specialties) if specialties else '') or None
+                        existing.address        = address
+                        existing.contact_person = contact_person
+                        phone_to_existing[normalized] = existing
+                        updated_count += 1
+                    else:
+                        errors.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
 
             except Exception as e:
                 errors.append(f'第{row_num}列：{str(e)}')
@@ -89,11 +105,10 @@ def import_clinics(file_path, db, Clinic):
         db.session.commit()
 
         return {
-            'success':       True,
-            'imported':      imported_count,
-            'skipped':       skipped_count,
-            'skipped_names': skipped_names,
-            'errors':        errors,
+            'success':  True,
+            'imported': imported_count,
+            'updated':  updated_count,
+            'errors':   errors,
         }
 
     except Exception as e:

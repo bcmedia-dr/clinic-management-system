@@ -1441,10 +1441,8 @@
                 const resultDiv = document.getElementById('importCustomResult');
 
                 if (result.success) {
-                    let skippedHtml = '';
-                    if (result.skipped > 0) {
-                        skippedHtml = `<br><br>⚠️ 跳過 ${result.skipped} 筆（電話重複）：<br>${result.skipped_names.join('、')}`;
-                    }
+                    let updatedHtml = result.updated > 0
+                        ? `<br>更新 ${result.updated} 筆（電話已存在）` : '';
                     let errorHtml = '';
                     if (result.errors > 0) {
                         errorHtml = `<br><br>❌ 錯誤 ${result.errors} 筆：<br>${result.error_details.join('<br>')}`;
@@ -1452,7 +1450,7 @@
                     resultDiv.innerHTML = `
                         <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
                             <strong>✅ 匯入完成</strong><br>
-                            新增 ${result.imported} 筆${skippedHtml}${errorHtml}
+                            新增 ${result.imported} 筆${updatedHtml}${errorHtml}
                         </div>
                     `;
                     resultDiv.style.display = 'block';
@@ -1484,14 +1482,12 @@
                 const resultDiv = document.getElementById('importResult');
 
                 if (result.success) {
-                    let skippedHtml = '';
-                    if (result.skipped > 0) {
-                        skippedHtml = `<br><br>⚠️ 跳過 ${result.skipped} 筆（電話重複）：<br>${result.skipped_names.join('、')}`;
-                    }
+                    let updatedHtml = result.updated > 0
+                        ? `<br>更新 ${result.updated} 筆（電話已存在）` : '';
                     resultDiv.innerHTML = `
                         <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
                             <strong>✅ 匯入完成</strong><br>
-                            新增 ${result.imported} 筆${skippedHtml}
+                            新增 ${result.imported} 筆${updatedHtml}
                             ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
                         </div>
                     `;

@@ -995,16 +995,16 @@ def import_campaign_clinics(campaign_id):
                     return str(row[idx]).strip()
             return ''
 
+        # 建立電話 → 診所物件對應表（用 phone_normalized 為鍵）
         phone_to_clinic = {}
         for c in Clinic.query.all():
-            np = _normalize_phone(c.phone)
-            if np:
-                phone_to_clinic[np] = c
+            if c.phone_normalized:
+                phone_to_clinic[c.phone_normalized] = c
 
         in_campaign = {cc.clinic_id for cc in
                        CampaignClinic.query.filter_by(campaign_id=campaign_id).all()}
 
-        new_clinics_count = already_exists = recorded = already_in_campaign = 0
+        new_clinics_count = updated_count = recorded = already_in_campaign = 0
         errors = []
         processed_clinics = []  # 記錄本次處理過的診所，匯入後連動合作項目
 
@@ -1020,8 +1020,24 @@ def import_campaign_clinics(campaign_id):
                 continue
 
             if normalized in phone_to_clinic:
+                # 電話已存在 → 更新診所基本資料（phone / phone_normalized 不動）
                 clinic = phone_to_clinic[normalized]
-                already_exists += 1
+                new_region  = _resolve(row, '縣市') or None
+                new_district = _resolve(row, '區域') or None
+                new_name_raw = _resolve(row, '診所名稱', '院名')
+                new_spec    = normalize_specialty(_resolve(row, '科別')) or None
+                new_addr    = _resolve(row, '地址', '院址') or None
+                new_contact = _resolve(row, '負責人', '聯絡人') or None
+                if new_region:   clinic.region         = new_region
+                if new_district: clinic.district       = new_district
+                if new_name_raw:
+                    from import_custom import _parse_name
+                    new_name, _ = _parse_name(new_name_raw)
+                    if new_name: clinic.name = new_name
+                if new_spec:    clinic.specialties    = new_spec
+                if new_addr:    clinic.address        = new_addr
+                if new_contact: clinic.contact_person = new_contact
+                updated_count += 1
             else:
                 raw_name = _resolve(row, '診所名稱', '院名')
                 if not raw_name:
@@ -1052,14 +1068,14 @@ def import_campaign_clinics(campaign_id):
                     phone_to_clinic[normalized] = clinic
                     new_clinics_count += 1
                 except IntegrityError:
+                    # 並發情況：INSERT 失敗但 phone_to_clinic 未命中，改為更新
                     sp.rollback()
-                    # 資料庫已有此電話（並發或舊資料），查出現有診所繼續使用
                     clinic = Clinic.query.filter_by(phone_normalized=normalized).first()
                     if not clinic:
                         errors.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
                         continue
                     phone_to_clinic[normalized] = clinic
-                    already_exists += 1
+                    updated_count += 1
 
             processed_clinics.append(clinic)
 
@@ -1087,7 +1103,7 @@ def import_campaign_clinics(campaign_id):
         return jsonify({
             'success':             True,
             'new_clinics':         new_clinics_count,
-            'already_exists':      already_exists,
+            'updated':             updated_count,
             'recorded':            recorded,
             'already_in_campaign': already_in_campaign,
             'errors':              errors,
@@ -1101,6 +1117,17 @@ def import_campaign_clinics(campaign_id):
             os.remove(temp_path)
         db.session.rollback()
         return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
+
+@app.route('/api/campaigns/<int:campaign_id>/clinics/all', methods=['DELETE'])
+def clear_campaign_clinics(campaign_id):
+    """清空指定活動的所有診所名單（只刪 campaign_clinic 關聯，不動 clinic 資料）"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    Campaign.query.get_or_404(campaign_id)
+    deleted = CampaignClinic.query.filter_by(campaign_id=campaign_id).delete()
+    db.session.commit()
+    return jsonify({'success': True, 'deleted': deleted})
+
 
 @app.route('/api/campaigns/<int:campaign_id>/export', methods=['GET'])
 def export_campaign_clinics(campaign_id):

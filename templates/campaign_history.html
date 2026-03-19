@@ -159,6 +159,10 @@
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
             color: white;
         }
+        .btn-clear-campaign {
+            background: linear-gradient(135deg, #e53935 0%, #e35d5b 100%);
+            color: white;
+        }
         .btn-action:hover { opacity: 0.88; }
 
         .filter-row {
@@ -323,6 +327,7 @@
                 <div class="campaign-actions">
                     <button class="btn-action btn-import-campaign" onclick="showImportModal()">📤 匯入名單</button>
                     <button class="btn-action btn-export-campaign" onclick="exportClinics()">📥 匯出名單</button>
+                    <button class="btn-action btn-clear-campaign" onclick="clearClinics()">🗑️ 清空名單</button>
                 </div>
                 <div class="filter-row">
                     <select class="filter-select" id="filterRegion" onchange="loadCampaignClinics()">
@@ -862,6 +867,24 @@
 
         // ── 匯入 Modal ───────────────────────────────────────
 
+        // ── 清空名單 ─────────────────────────────────────────
+        async function clearClinics() {
+            if (!currentCampaignId) { alert('請先選擇活動'); return; }
+            const confirmed = confirm('確定要清空此活動的所有診所名單嗎？此操作無法復原。');
+            if (!confirmed) return;
+            try {
+                const res = await fetch(`/api/campaigns/${currentCampaignId}/clinics/all`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    alert(`已清空，共刪除 ${result.deleted} 筆`);
+                    selectCampaign(currentCampaignId);
+                    loadCampaigns();
+                } else {
+                    alert('清空失敗：' + (result.error || '未知錯誤'));
+                }
+            } catch(e) { alert('清空失敗：' + e.message); }
+        }
+
         function showImportModal() {
             document.getElementById('importFile').value = '';
             document.getElementById('importResult').style.display = 'none';
@@ -887,7 +910,7 @@
                     div.innerHTML = `<div style="background:#d4edda;color:#155724;padding:14px;border-radius:8px;">
                         <strong>✅ 匯入完成</strong><br>
                         新增診所 ${result.new_clinics} 間 ／
-                        總表已有 ${result.already_exists} 間 ／
+                        更新既有 ${result.updated} 間 ／
                         記錄參加 ${result.recorded} 間
                         ${result.already_in_campaign > 0 ? `（已在活動中 ${result.already_in_campaign} 間）` : ''}
                         ${errHtml}
