@@ -60,13 +60,14 @@ def import_clinics(file_path, db, Clinic):
                     continue
 
                 clinic = Clinic(
-                    region=region,
-                    district=district,
-                    name=name,
-                    specialties=specialties,
-                    address=address,
-                    phone=phone_fmt,
-                    contact_person=contact_person,
+                    region           = region,
+                    district         = district,
+                    name             = name,
+                    specialties      = specialties,
+                    address          = address,
+                    phone            = phone_fmt,
+                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    contact_person   = contact_person,
                 )
                 db.session.add(clinic)
                 if normalized:

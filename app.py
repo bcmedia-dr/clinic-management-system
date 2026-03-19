@@ -30,23 +30,24 @@ db = SQLAlchemy(app)
 # ── 資料模型 ─────────────────────────────────────────────────
 
 class Clinic(db.Model):
-    id             = db.Column(db.Integer, primary_key=True)
-    region         = db.Column(db.String(50))
-    district       = db.Column(db.String(50))
-    name           = db.Column(db.String(200))
-    media_items    = db.Column(db.String(500))                    # 舊欄位（保留）
-    specialties    = db.Column(db.String(500))
-    address        = db.Column(db.String(300))
-    phone          = db.Column(db.String(50))
-    contact_person = db.Column(db.String(100))
-    business_hours = db.Column(db.String(200))
-    note           = db.Column(db.Text)
-    col_yaodai     = db.Column(db.Boolean, default=False)
-    col_haibao     = db.Column(db.Boolean, default=False)
-    col_paiyang    = db.Column(db.Boolean, default=False)
-    col_baiwei     = db.Column(db.Boolean, default=False)
-    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at     = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id               = db.Column(db.Integer, primary_key=True)
+    region           = db.Column(db.String(50))
+    district         = db.Column(db.String(50))
+    name             = db.Column(db.String(200))
+    media_items      = db.Column(db.String(500))                    # 舊欄位（保留）
+    specialties      = db.Column(db.String(500))
+    address          = db.Column(db.String(300))
+    phone            = db.Column(db.String(50))
+    phone_normalized = db.Column(db.String(50), unique=True)        # 正規化電話（僅數字），用於唯一性約束
+    contact_person   = db.Column(db.String(100))
+    business_hours   = db.Column(db.String(200))
+    note             = db.Column(db.Text)
+    col_yaodai       = db.Column(db.Boolean, default=False)
+    col_haibao       = db.Column(db.Boolean, default=False)
+    col_paiyang      = db.Column(db.Boolean, default=False)
+    col_baiwei       = db.Column(db.Boolean, default=False)
+    created_at       = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at       = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class HealthMall(db.Model):
@@ -226,20 +227,22 @@ def create_clinic():
         return jsonify({'error': '權限不足'}), 403
     try:
         data = request.get_json()
+        phone_val = data.get('phone')
         clinic = Clinic(
-            region=data.get('region'),
-            district=data.get('district'),
-            name=data.get('name'),
-            col_yaodai=data.get('col_yaodai', False),
-            col_haibao=data.get('col_haibao', False),
-            col_paiyang=data.get('col_paiyang', False),
-            col_baiwei=data.get('col_baiwei', False),
-            specialties=data.get('specialties'),
-            address=data.get('address'),
-            phone=data.get('phone'),
-            contact_person=data.get('contact_person'),
-            business_hours=data.get('business_hours'),
-            note=data.get('note')
+            region           = data.get('region'),
+            district         = data.get('district'),
+            name             = data.get('name'),
+            col_yaodai       = data.get('col_yaodai', False),
+            col_haibao       = data.get('col_haibao', False),
+            col_paiyang      = data.get('col_paiyang', False),
+            col_baiwei       = data.get('col_baiwei', False),
+            specialties      = data.get('specialties'),
+            address          = data.get('address'),
+            phone            = phone_val,
+            phone_normalized = _normalize_phone(phone_val) or None,  # 同步寫入正規化電話
+            contact_person   = data.get('contact_person'),
+            business_hours   = data.get('business_hours'),
+            note             = data.get('note')
         )
         db.session.add(clinic)
         db.session.commit()
@@ -255,6 +258,7 @@ def update_clinic(clinic_id):
     try:
         clinic = Clinic.query.get_or_404(clinic_id)
         data = request.get_json()
+        phone_val             = data.get('phone')
         clinic.region         = data.get('region')
         clinic.district       = data.get('district')
         clinic.name           = data.get('name')
@@ -264,7 +268,8 @@ def update_clinic(clinic_id):
         clinic.col_baiwei     = data.get('col_baiwei', False)
         clinic.specialties    = data.get('specialties')
         clinic.address        = data.get('address')
-        clinic.phone          = data.get('phone')
+        clinic.phone          = phone_val
+        clinic.phone_normalized = _normalize_phone(phone_val) or None  # 同步更新正規化電話
         clinic.contact_person = data.get('contact_person')
         clinic.business_hours = data.get('business_hours')
         clinic.note           = data.get('note')
@@ -1017,15 +1022,17 @@ def import_campaign_clinics(campaign_id):
                 if not name:
                     errors.append(f'第{row_num}列：清理後診所名稱為空（原始值：{raw_name}）')
                     continue
+                phone_fmt = format_phone(phone_raw, _resolve(row, '縣市') or None)
                 clinic = Clinic(
-                    region        =_resolve(row, '縣市') or None,
-                    district      =_resolve(row, '區域') or None,
-                    name          =name,
-                    specialties   =_resolve(row, '科別') or None,
-                    address       =_resolve(row, '地址', '院址') or None,
-                    phone         =format_phone(phone_raw, _resolve(row, '縣市') or None),
-                    contact_person=_resolve(row, '負責人', '聯絡人') or None,
-                    note          =extracted_note or None,
+                    region           = _resolve(row, '縣市') or None,
+                    district         = _resolve(row, '區域') or None,
+                    name             = name,
+                    specialties      = _resolve(row, '科別') or None,
+                    address          = _resolve(row, '地址', '院址') or None,
+                    phone            = phone_fmt,
+                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    contact_person   = _resolve(row, '負責人', '聯絡人') or None,
+                    note             = extracted_note or None,
                 )
                 db.session.add(clinic)
                 db.session.flush()
@@ -1259,12 +1266,13 @@ def import_baiwei():
                     errors.append(f'第{row_num}列：診所名稱清理後為空（原始：{raw_name}）')
                     continue
                 clinic = Clinic(
-                    region   =_get(row, '縣市') or None,
-                    district =_get(row, '區域') or None,
-                    name     =name,
-                    address  =_get(row, '地址') or None,
-                    phone    =format_phone(phone_raw, _get(row, '縣市') or None),
-                    note     =extracted_note or None,
+                    region           = _get(row, '縣市') or None,
+                    district         = _get(row, '區域') or None,
+                    name             = name,
+                    address          = _get(row, '地址') or None,
+                    phone            = format_phone(phone_raw, _get(row, '縣市') or None),
+                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    note             = extracted_note or None,
                 )
                 db.session.add(clinic)
                 db.session.flush()
@@ -1404,6 +1412,12 @@ with app.app_context():
         'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS month INTEGER',
         'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS cooperation_items VARCHAR(200)',
         'ALTER TABLE campaign ADD COLUMN IF NOT EXISTS cooperation_other VARCHAR(200)',
+        # 新增正規化電話欄位（移除非數字後的電話），用於唯一性約束
+        'ALTER TABLE clinic ADD COLUMN IF NOT EXISTS phone_normalized VARCHAR(50)',
+        # 填入現有診所的正規化電話
+        "UPDATE clinic SET phone_normalized = regexp_replace(phone, '[^0-9]', '', 'g') WHERE phone IS NOT NULL AND phone_normalized IS NULL",
+        # 建立唯一索引（排除空值，避免無電話的診所互相衝突）
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_clinic_phone_normalized ON clinic(phone_normalized) WHERE phone_normalized IS NOT NULL AND phone_normalized <> ''",
         """CREATE TABLE IF NOT EXISTS baiwei_doctor (
             id SERIAL PRIMARY KEY,
             clinic_id INTEGER REFERENCES clinic(id) ON DELETE SET NULL,

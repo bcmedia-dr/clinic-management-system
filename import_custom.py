@@ -103,14 +103,15 @@ def import_custom_clinics(file_path, db, Clinic):
                     continue
 
                 clinic = Clinic(
-                    region         = _get(row, '縣市') or None,
-                    district       = _get(row, '區域') or None,
-                    name           = name,
-                    specialties    = _get(row, '科別') or None,
-                    address        = _get(row, '院址') or None,
-                    phone          = phone_fmt or None,
-                    contact_person = _get(row, '聯絡人') or None,
-                    note           = extracted_note or None,
+                    region           = _get(row, '縣市') or None,
+                    district         = _get(row, '區域') or None,
+                    name             = name,
+                    specialties      = _get(row, '科別') or None,
+                    address          = _get(row, '院址') or None,
+                    phone            = phone_fmt or None,
+                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    contact_person   = _get(row, '聯絡人') or None,
+                    note             = extracted_note or None,
                 )
                 db.session.add(clinic)
                 if normalized:
