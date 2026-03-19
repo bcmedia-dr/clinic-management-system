@@ -193,6 +193,15 @@
         }
         .empty-td { text-align: center; padding: 50px; color: #bbb; font-size: 15px; }
 
+        /* ── 診所編輯按鈕 ── */
+        .btn-edit-clinic {
+            padding: 4px 10px; border-radius: 6px; font-size: 12px;
+            font-family: 'Noto Sans TC', sans-serif; cursor: pointer;
+            border: 1px solid #e96c2c; color: #e96c2c; background: white;
+            font-weight: 600; transition: all 0.2s;
+        }
+        .btn-edit-clinic:hover { background: #e96c2c; color: white; }
+
         /* ── Modals ── */
         .modal {
             display: none; position: fixed; z-index: 1000;
@@ -346,7 +355,7 @@
                         <thead>
                             <tr>
                                 <th>縣市</th><th>區域</th><th>診所名稱</th>
-                                <th>科別</th><th>電話</th><th>聯絡人</th>
+                                <th>科別</th><th>電話</th><th>聯絡人</th><th>操作</th>
                             </tr>
                         </thead>
                         <tbody id="clinicTable"></tbody>
@@ -478,11 +487,61 @@
         </div>
     </div>
 
+    <!-- 編輯診所 Modal -->
+    <div class="modal" id="editClinicModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ 編輯診所資料</h2>
+                <button class="close-btn" onclick="closeEditClinicModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>縣市</label>
+                <select id="editClinicRegion">
+                    <option value="">請選擇縣市</option>
+                    <option value="臺北市">臺北市</option><option value="新北市">新北市</option>
+                    <option value="桃園市">桃園市</option><option value="新竹市">新竹市</option>
+                    <option value="新竹縣">新竹縣</option><option value="苗栗縣">苗栗縣</option>
+                    <option value="臺中市">臺中市</option><option value="彰化縣">彰化縣</option>
+                    <option value="南投縣">南投縣</option><option value="雲林縣">雲林縣</option>
+                    <option value="嘉義市">嘉義市</option><option value="嘉義縣">嘉義縣</option>
+                    <option value="臺南市">臺南市</option><option value="高雄市">高雄市</option>
+                    <option value="屏東縣">屏東縣</option><option value="基隆市">基隆市</option>
+                    <option value="宜蘭縣">宜蘭縣</option><option value="花蓮縣">花蓮縣</option>
+                    <option value="臺東縣">臺東縣</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>區域</label>
+                <input type="text" id="editClinicDistrict" placeholder="例：大安區">
+            </div>
+            <div class="form-group">
+                <label>診所名稱 <span style="color:#e96c2c;">*</span></label>
+                <input type="text" id="editClinicName">
+            </div>
+            <div class="form-group">
+                <label>科別</label>
+                <input type="text" id="editClinicSpecialties" placeholder="例：小兒科/家醫科">
+            </div>
+            <div class="form-group">
+                <label>電話</label>
+                <input type="text" id="editClinicPhone">
+            </div>
+            <div class="form-group">
+                <label>聯絡人</label>
+                <input type="text" id="editClinicContact">
+            </div>
+            <div id="editClinicError" style="color:#dc3545;font-size:13px;margin-bottom:12px;display:none;"></div>
+            <button class="btn-submit" onclick="saveEditClinic()">儲存變更</button>
+        </div>
+    </div>
+
     <script>
         let currentCampaignId   = null;
         let currentCampaignName = '';
-        let allCampaigns        = [];   // 儲存所有活動資料，供編輯 modal 使用
+        let allCampaigns        = [];   // 儲存所有活動資料，供編輯活動 modal 使用
         let editingCampaignId   = null; // 目前正在編輯的活動 ID
+        let allClinics          = [];   // 暫存當前活動的診所清單，供編輯診所 modal 使用
+        let editingClinicId     = null; // 目前正在編輯的診所 ID
 
         function fmtPeriod(year, month) {
             if (year && month) return `${year}年${month}月`;
@@ -603,9 +662,10 @@
                 const clinics = await res.json();
                 document.getElementById('filteredCount').textContent =
                     `共 ${clinics.length} 筆`;
+                allClinics = clinics; // 暫存供編輯 modal 使用
                 const tbody = document.getElementById('clinicTable');
                 if (clinics.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="empty-td">尚無資料</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-td">尚無資料</td></tr>';
                     return;
                 }
                 tbody.innerHTML = clinics.map(c => {
@@ -617,6 +677,7 @@
                         <td>${c.region}</td><td>${c.district}</td>
                         <td>${c.name}</td><td>${spec}</td>
                         <td>${c.phone}</td><td>${c.contact_person}</td>
+                        <td><button class="btn-edit-clinic" onclick="openEditClinicModal(${c.id})">編輯</button></td>
                     </tr>`;
                 }).join('');
             } catch(e) {
@@ -843,11 +904,71 @@
             } catch(e) { alert('匯入失敗：' + e.message); }
         }
 
+        // ── 編輯診所 Modal ───────────────────────────────────
+
+        function openEditClinicModal(clinicId) {
+            const c = allClinics.find(x => x.id === clinicId);
+            if (!c) return;
+            editingClinicId = clinicId;
+            document.getElementById('editClinicRegion').value     = c.region        || '';
+            document.getElementById('editClinicDistrict').value   = c.district      || '';
+            document.getElementById('editClinicName').value       = c.name          || '';
+            document.getElementById('editClinicSpecialties').value = c.specialties  || '';
+            document.getElementById('editClinicPhone').value      = c.phone         || '';
+            document.getElementById('editClinicContact').value    = c.contact_person|| '';
+            document.getElementById('editClinicError').style.display = 'none';
+            document.getElementById('editClinicModal').style.display = 'block';
+        }
+
+        function closeEditClinicModal() {
+            document.getElementById('editClinicModal').style.display = 'none';
+            editingClinicId = null;
+        }
+
+        async function saveEditClinic() {
+            const name     = document.getElementById('editClinicName').value.trim();
+            const errEl    = document.getElementById('editClinicError');
+            if (!name) {
+                errEl.textContent = '診所名稱不能為空';
+                errEl.style.display = 'block'; return;
+            }
+            errEl.style.display = 'none';
+            try {
+                const res = await fetch(
+                    `/api/campaigns/${currentCampaignId}/clinics/${editingClinicId}`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            region:         document.getElementById('editClinicRegion').value.trim(),
+                            district:       document.getElementById('editClinicDistrict').value.trim(),
+                            name,
+                            specialties:    document.getElementById('editClinicSpecialties').value.trim(),
+                            phone:          document.getElementById('editClinicPhone').value.trim(),
+                            contact_person: document.getElementById('editClinicContact').value.trim(),
+                        }),
+                    }
+                );
+                const result = await res.json();
+                if (result.success) {
+                    closeEditClinicModal();
+                    loadCampaignClinics(); // 重新整理表格
+                } else {
+                    errEl.textContent = result.error || '儲存失敗';
+                    errEl.style.display = 'block';
+                }
+            } catch(e) {
+                errEl.textContent = '儲存失敗：' + e.message;
+                errEl.style.display = 'block';
+            }
+        }
+
         // ── 關閉 Modal ───────────────────────────────────────
         window.onclick = function(e) {
-            if (e.target === document.getElementById('addModal'))    closeAddModal();
-            if (e.target === document.getElementById('importModal')) closeImportModal();
-            if (e.target === document.getElementById('editModal'))   closeEditModal();
+            if (e.target === document.getElementById('addModal'))        closeAddModal();
+            if (e.target === document.getElementById('importModal'))     closeImportModal();
+            if (e.target === document.getElementById('editModal'))       closeEditModal();
+            if (e.target === document.getElementById('editClinicModal')) closeEditClinicModal();
         };
     </script>
 </body>

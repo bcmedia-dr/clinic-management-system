@@ -883,6 +883,27 @@ def get_campaign_clinics(campaign_id):
         })
     return jsonify(result)
 
+@app.route('/api/campaigns/<int:campaign_id>/clinics/<int:clinic_id>', methods=['PUT'])
+def update_campaign_clinic(campaign_id, clinic_id):
+    """更新活動中某間診所的基本資料（直接修改 clinic table）"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    # 確認診所確實屬於此活動
+    link = CampaignClinic.query.filter_by(campaign_id=campaign_id, clinic_id=clinic_id).first()
+    if not link:
+        return jsonify({'error': '此診所不在該活動中'}), 404
+    clinic = Clinic.query.get_or_404(clinic_id)
+    data = request.get_json() or {}
+    # 只更新有傳入的欄位，避免意外清空
+    if 'region'         in data: clinic.region         = data['region']
+    if 'district'       in data: clinic.district       = data['district']
+    if 'name'           in data: clinic.name           = data['name']
+    if 'specialties'    in data: clinic.specialties    = data['specialties']
+    if 'phone'          in data: clinic.phone          = data['phone']
+    if 'contact_person' in data: clinic.contact_person = data['contact_person']
+    db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/campaigns/<int:campaign_id>/import', methods=['POST'])
 def import_campaign_clinics(campaign_id):
     if session.get('role') != 'admin':
