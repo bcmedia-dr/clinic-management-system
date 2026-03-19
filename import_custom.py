@@ -1,6 +1,6 @@
 from openpyxl import load_workbook
 import re
-from phone_utils import format_phone
+from phone_utils import format_phone, normalize_specialty
 from sqlalchemy.exc import IntegrityError
 
 
@@ -107,7 +107,7 @@ def import_custom_clinics(file_path, db, Clinic):
                     region           = _get(row, '縣市') or None,
                     district         = _get(row, '區域') or None,
                     name             = name,
-                    specialties      = _get(row, '科別') or None,
+                    specialties      = normalize_specialty(_get(row, '科別')) or None,
                     address          = _get(row, '院址') or None,
                     phone            = phone_fmt or None,
                     phone_normalized = normalized or None,  # format_phone 後的完整數字

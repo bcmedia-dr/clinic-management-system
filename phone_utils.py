@@ -1,8 +1,78 @@
 """
-phone_utils.py — 台灣電話號碼格式化工具
+phone_utils.py — 台灣電話號碼格式化工具 + 科別標準化工具
 供 app.py、import_data.py、import_custom.py 共用，避免循環 import
 """
 import re
+
+
+# ── 科別標準化 ────────────────────────────────────────────────
+
+# 標準科別白名單（所有科別最終都必須是其中之一）
+STANDARD_SPECIALTIES = [
+    '小兒科', '家醫科', '耳鼻喉科', '內科', '外科', '皮膚科',
+    '婦產科', '復健/骨科', '中醫', '內兒科', '神經科', '精神科',
+    '身心科', '泌尿科', '牙科', '眼科', '其他',
+]
+
+# 非標準科別 → 標準科別的對應表
+SPECIALTY_MAPPING = {
+    '腸胃科':    '內科',
+    '肝膽腸胃科': '內科',
+    '腸胃肝膽科': '內科',
+    '消化內科':  '內科',
+    '家庭醫學科': '家醫科',
+    '家庭醫學':  '家醫科',
+    '家醫':     '家醫科',
+    '腸胃專科':  '內科',
+    '一般外科':  '外科',
+    '整形外科':  '外科',
+    '小兒外科':  '小兒科/外科',   # 對應後為複合科別，會再次拆開處理
+    '骨科':     '復健/骨科',
+    '復健':     '復健/骨科',   # '復健/骨科' 被切開後 '復健' 也能對應回來
+    '復健科':   '復健/骨科',
+    '骨科復健':  '復健/骨科',
+}
+
+
+def normalize_specialty(raw: str) -> str:
+    """
+    將原始科別字串標準化：
+    1. 用 /、、，, 拆開（支援全形/半形逗號、頓號、斜線）
+    2. 每個科別套用 SPECIALTY_MAPPING 對應規則
+    3. 不在白名單也不在對應規則 → 歸類為「其他」
+    4. 去重複後用 / 合併回傳
+    """
+    if not raw:
+        return ''
+
+    parts = re.split(r'[/、，,]', str(raw))
+    seen = []
+    seen_set = set()
+
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+
+        # 套用對應規則
+        mapped = SPECIALTY_MAPPING.get(part, part)
+
+        if mapped in STANDARD_SPECIALTIES:
+            # 對應結果整個在白名單（含 '復健/骨科' 這類含斜線的標準科別）
+            if mapped not in seen_set:
+                seen.append(mapped)
+                seen_set.add(mapped)
+        else:
+            # 對應結果不在白名單，嘗試拆分（處理 '小兒科/外科' 這類複合對應）
+            for sub in mapped.split('/'):
+                sub = sub.strip()
+                if sub not in STANDARD_SPECIALTIES:
+                    sub = '其他'
+                if sub not in seen_set:
+                    seen.append(sub)
+                    seen_set.add(sub)
+
+    return '/'.join(seen)
 
 
 # 區碼 → 本地號碼長度對應表

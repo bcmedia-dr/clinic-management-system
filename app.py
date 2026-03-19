@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 from export import export_clinics
 from import_data import import_clinics, import_health_mall
 from import_custom import import_custom_clinics
-from phone_utils import format_phone
+from phone_utils import format_phone, normalize_specialty
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback-only-for-local')
@@ -1037,7 +1037,7 @@ def import_campaign_clinics(campaign_id):
                     region           = _resolve(row, '縣市') or None,
                     district         = _resolve(row, '區域') or None,
                     name             = name,
-                    specialties      = _resolve(row, '科別') or None,
+                    specialties      = normalize_specialty(_resolve(row, '科別')) or None,
                     address          = _resolve(row, '地址', '院址') or None,
                     phone            = phone_fmt,
                     phone_normalized = normalized or None,  # format_phone 後的完整數字
@@ -1324,7 +1324,7 @@ def import_baiwei():
                 address     =_get(row, '地址') or clinic.address,
                 phone       =phone_fmt_bw,
                 doctor_name =doctor_name,
-                specialty   =_get(row, '科別') or None,
+                specialty   = normalize_specialty(_get(row, '科別')) or None,
             )
             db.session.add(doc)
             existing_keys.add((normalized, doctor_name))

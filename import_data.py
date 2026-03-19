@@ -1,7 +1,7 @@
 from openpyxl import load_workbook
 from datetime import datetime
 import re
-from phone_utils import format_phone
+from phone_utils import format_phone, normalize_specialty
 from sqlalchemy.exc import IntegrityError
 
 
@@ -64,7 +64,7 @@ def import_clinics(file_path, db, Clinic):
                     region           = region,
                     district         = district,
                     name             = name,
-                    specialties      = specialties,
+                    specialties      = normalize_specialty(str(specialties) if specialties else '') or None,
                     address          = address,
                     phone            = phone_fmt,
                     phone_normalized = normalized or None,  # format_phone 後的完整數字

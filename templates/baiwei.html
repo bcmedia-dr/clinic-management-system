@@ -197,6 +197,21 @@
         <div class="controls-row">
             <select class="filter-select" id="filterSpecialty" onchange="applyFilter()">
                 <option value="">全部科別</option>
+                <option value="小兒科">小兒科</option>
+                <option value="家醫科">家醫科</option>
+                <option value="耳鼻喉科">耳鼻喉科</option>
+                <option value="內科">內科</option>
+                <option value="外科">外科</option>
+                <option value="皮膚科">皮膚科</option>
+                <option value="婦產科">婦產科</option>
+                <option value="復健/骨科">復健/骨科</option>
+                <option value="中醫">中醫</option>
+                <option value="內兒科">內兒科</option>
+                <option value="神經科">神經科</option>
+                <option value="精神科">精神科</option>
+                <option value="身心科">身心科</option>
+                <option value="眼科">眼科</option>
+                <option value="其他">其他</option>
             </select>
             <span class="total-count" id="totalCount"></span>
             <div class="spacer"></div>
@@ -366,7 +381,6 @@ async function doImport() {
         }
         resultEl.innerHTML = html;
         loadData();
-        loadSpecialties();
     } else {
         resultEl.className = 'import-result error';
         resultEl.textContent = '❌ ' + (data.error || '匯入失敗');
@@ -381,8 +395,8 @@ document.getElementById('importModal').addEventListener('click', function(e) {
     if (e.target === this) closeImportModal();
 });
 
-// 先載入科別選單，再載入資料
-loadSpecialties().then(() => loadData());
+// 載入資料（科別選單已改為靜態固定清單，不需動態載入）
+loadData();
 </script>
 </body>
 </html>
