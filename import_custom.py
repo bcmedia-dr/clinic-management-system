@@ -95,8 +95,8 @@ def import_custom_clinics(file_path, db, Clinic):
                     continue
 
                 phone_raw  = _get(row, '電話')
-                normalized = _normalize_phone(phone_raw)
-                phone_fmt  = format_phone(phone_raw, _get(row, '縣市') or None)
+                phone_fmt  = format_phone(phone_raw, _get(row, '縣市') or None)   # 先補區碼
+                normalized = _normalize_phone(phone_fmt)                            # 再正規化（含區碼的完整數字）
 
                 if normalized and normalized in existing_phones:
                     skipped_count += 1
@@ -110,7 +110,7 @@ def import_custom_clinics(file_path, db, Clinic):
                     specialties      = _get(row, '科別') or None,
                     address          = _get(row, '院址') or None,
                     phone            = phone_fmt or None,
-                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    phone_normalized = normalized or None,  # format_phone 後的完整數字
                     contact_person   = _get(row, '聯絡人') or None,
                     note             = extracted_note or None,
                 )

@@ -1013,7 +1013,8 @@ def import_campaign_clinics(campaign_id):
             if not any(row):
                 continue
             phone_raw  = _resolve(row, '電話')
-            normalized = _normalize_phone(phone_raw)
+            phone_fmt  = format_phone(phone_raw, _resolve(row, '縣市') or None)  # 先補區碼
+            normalized = _normalize_phone(phone_fmt)                              # 再正規化（含區碼的完整數字）
             if not normalized:
                 errors.append(f'第{row_num}列：缺少電話')
                 continue
@@ -1032,7 +1033,6 @@ def import_campaign_clinics(campaign_id):
                 if not name:
                     errors.append(f'第{row_num}列：清理後診所名稱為空（原始值：{raw_name}）')
                     continue
-                phone_fmt = format_phone(phone_raw, _resolve(row, '縣市') or None)
                 clinic = Clinic(
                     region           = _resolve(row, '縣市') or None,
                     district         = _resolve(row, '區域') or None,
@@ -1040,7 +1040,7 @@ def import_campaign_clinics(campaign_id):
                     specialties      = _resolve(row, '科別') or None,
                     address          = _resolve(row, '地址', '院址') or None,
                     phone            = phone_fmt,
-                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    phone_normalized = normalized or None,  # format_phone 後的完整數字
                     contact_person   = _resolve(row, '負責人', '聯絡人') or None,
                     note             = extracted_note or None,
                 )
@@ -1261,7 +1261,8 @@ def import_baiwei():
 
             phone_raw   = _get(row, '電話')
             doctor_name = _get(row, '醫師', '醫師名字')
-            normalized  = _normalize_phone(phone_raw)
+            phone_fmt_bw = format_phone(phone_raw, _get(row, '縣市') or None)  # 先補區碼
+            normalized   = _normalize_phone(phone_fmt_bw)                       # 再正規化（含區碼的完整數字）
 
             if not normalized:
                 errors.append(f'第{row_num}列：缺少電話')
@@ -1292,8 +1293,8 @@ def import_baiwei():
                     district         = _get(row, '區域') or None,
                     name             = name,
                     address          = _get(row, '地址') or None,
-                    phone            = format_phone(phone_raw, _get(row, '縣市') or None),
-                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    phone            = phone_fmt_bw,
+                    phone_normalized = normalized or None,  # format_phone 後的完整數字
                     note             = extracted_note or None,
                 )
                 try:
@@ -1320,7 +1321,7 @@ def import_baiwei():
                 region      =_get(row, '縣市') or clinic.region,
                 district    =_get(row, '區域') or clinic.district,
                 address     =_get(row, '地址') or clinic.address,
-                phone       =format_phone(phone_raw, _get(row, '縣市') or clinic.region or None),
+                phone       =phone_fmt_bw,
                 doctor_name =doctor_name,
                 specialty   =_get(row, '科別') or None,
             )

@@ -51,9 +51,9 @@ def import_clinics(file_path, db, Clinic):
                     continue
 
                 phone_str  = str(phone) if phone else ''
-                normalized = _normalize_phone(phone_str)
                 region_str = str(region).strip() if region else None
-                phone_fmt  = format_phone(phone_str, region_str)
+                phone_fmt  = format_phone(phone_str, region_str)           # 先補區碼
+                normalized = _normalize_phone(phone_fmt)                    # 再正規化（含區碼的完整數字）
 
                 if normalized and normalized in existing_phones:
                     skipped_count += 1
@@ -67,7 +67,7 @@ def import_clinics(file_path, db, Clinic):
                     specialties      = specialties,
                     address          = address,
                     phone            = phone_fmt,
-                    phone_normalized = normalized or None,  # 同步寫入正規化電話
+                    phone_normalized = normalized or None,  # format_phone 後的完整數字
                     contact_person   = contact_person,
                 )
                 try:
