@@ -693,12 +693,21 @@ def campaign_match():
         ws = wb.active
         os.remove(temp_path)
 
-        header = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+        # 自動偵測 header 行：掃描前 5 列，找到含「電話」的那行
+        # （與 import_campaign_clinics 邏輯一致，支援第一列為標題列的 Excel）
+        header_row_idx = None
+        header = []
+        for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=5, values_only=True), start=1):
+            stripped = [str(v).strip() if v is not None else '' for v in row]
+            if '電話' in stripped:
+                header_row_idx = row_idx
+                header = stripped
+                break
+
+        if header_row_idx is None:
+            return jsonify({'error': 'Excel 缺少必要欄位：電話（掃描前 5 列均未找到）'}), 400
+
         col = {name: idx for idx, name in enumerate(header)}
-        REQUIRED = {'電話'}
-        missing = REQUIRED - col.keys()
-        if missing:
-            return jsonify({'error': f'Excel 缺少必要欄位：{", ".join(missing)}'}), 400
 
         def _get(row, name):
             idx = col.get(name)
@@ -707,7 +716,7 @@ def campaign_match():
             return str(row[idx]).strip() if row[idx] is not None else ''
 
         uploaded = []
-        for row in ws.iter_rows(min_row=2, values_only=True):
+        for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
             if not any(row):
                 continue
             phone_raw = _get(row, '電話')
