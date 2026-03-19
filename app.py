@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, date
 import os, re
 from collections import Counter
@@ -1034,10 +1035,22 @@ def import_campaign_clinics(campaign_id):
                     contact_person   = _resolve(row, '負責人', '聯絡人') or None,
                     note             = extracted_note or None,
                 )
-                db.session.add(clinic)
-                db.session.flush()
-                phone_to_clinic[normalized] = clinic
-                new_clinics_count += 1
+                try:
+                    # 用 savepoint 隔離 INSERT，UniqueViolation 只回滾該筆
+                    sp = db.session.begin_nested()
+                    db.session.add(clinic)
+                    db.session.flush()
+                    phone_to_clinic[normalized] = clinic
+                    new_clinics_count += 1
+                except IntegrityError:
+                    sp.rollback()
+                    # 資料庫已有此電話（並發或舊資料），查出現有診所繼續使用
+                    clinic = Clinic.query.filter_by(phone_normalized=normalized).first()
+                    if not clinic:
+                        errors.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
+                        continue
+                    phone_to_clinic[normalized] = clinic
+                    already_exists += 1
 
             processed_clinics.append(clinic)
             if clinic.id in in_campaign:
@@ -1274,9 +1287,20 @@ def import_baiwei():
                     phone_normalized = normalized or None,  # 同步寫入正規化電話
                     note             = extracted_note or None,
                 )
-                db.session.add(clinic)
-                db.session.flush()
-                phone_to_clinic[normalized] = clinic
+                try:
+                    # 用 savepoint 隔離 INSERT，UniqueViolation 只回滾該筆
+                    sp = db.session.begin_nested()
+                    db.session.add(clinic)
+                    db.session.flush()
+                    phone_to_clinic[normalized] = clinic
+                except IntegrityError:
+                    sp.rollback()
+                    # 資料庫已有此電話（並發或舊資料），查出現有診所繼續使用
+                    clinic = Clinic.query.filter_by(phone_normalized=normalized).first()
+                    if not clinic:
+                        errors.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
+                        continue
+                    phone_to_clinic[normalized] = clinic
 
             # 設定 col_baiwei
             clinic.col_baiwei = True

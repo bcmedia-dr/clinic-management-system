@@ -2,6 +2,7 @@ from openpyxl import load_workbook
 from datetime import datetime
 import re
 from phone_utils import format_phone
+from sqlalchemy.exc import IntegrityError
 
 
 def _normalize_phone(phone):
@@ -69,10 +70,18 @@ def import_clinics(file_path, db, Clinic):
                     phone_normalized = normalized or None,  # 同步寫入正規化電話
                     contact_person   = contact_person,
                 )
-                db.session.add(clinic)
-                if normalized:
-                    existing_phones.add(normalized)
-                imported_count += 1
+                try:
+                    # 用 savepoint 隔離每筆 INSERT，UniqueViolation 只回滾該筆
+                    sp = db.session.begin_nested()
+                    db.session.add(clinic)
+                    db.session.flush()
+                    if normalized:
+                        existing_phones.add(normalized)
+                    imported_count += 1
+                except IntegrityError:
+                    sp.rollback()  # 回滾到 savepoint，其餘已成功筆數不受影響
+                    skipped_count += 1
+                    skipped_names.append(str(name))
 
             except Exception as e:
                 errors.append(f'第{row_num}列：{str(e)}')
