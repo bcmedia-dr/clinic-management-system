@@ -1062,25 +1062,26 @@ def import_campaign_clinics(campaign_id):
                     already_exists += 1
 
             processed_clinics.append(clinic)
+
+            # 不管診所是新增還是已存在，都立即同步合作項目（只設 True，不取消已有勾選）
+            # 放在 continue 之前，確保 already_in_campaign 的診所也會更新
+            coop_items = campaign.cooperation_items or ''
+            if coop_items:
+                if '藥袋' in coop_items:
+                    clinic.col_yaodai = True
+                if '海報' in coop_items or '立牌' in coop_items:
+                    clinic.col_haibao = True
+                if '派樣' in coop_items:
+                    clinic.col_paiyang = True
+                if '百位' in coop_items:
+                    clinic.col_baiwei = True
+
             if clinic.id in in_campaign:
                 already_in_campaign += 1
                 continue
             db.session.add(CampaignClinic(campaign_id=campaign_id, clinic_id=clinic.id))
             in_campaign.add(clinic.id)
             recorded += 1
-
-        # 根據活動的合作項目，連動更新所有處理過的診所欄位（只設 True，不取消）
-        coop_items = campaign.cooperation_items or ''
-        if coop_items and processed_clinics:
-            for c in processed_clinics:
-                if '藥袋' in coop_items:
-                    c.col_yaodai = True
-                if '海報' in coop_items or '立牌' in coop_items:
-                    c.col_haibao = True
-                if '派樣' in coop_items:
-                    c.col_paiyang = True
-                if '百位' in coop_items:
-                    c.col_baiwei = True
 
         db.session.commit()
         return jsonify({
