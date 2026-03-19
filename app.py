@@ -729,11 +729,9 @@ def campaign_match():
             })
 
         clinics = Clinic.query.all()
-        phone_to_clinic = {}
-        for c in clinics:
-            np = _normalize_phone(c.phone)
-            if np:
-                phone_to_clinic[np] = c
+        # 用 phone_normalized 欄位建立比對表（已是 format_phone 後的完整含區碼數字）
+        # 避免 c.phone 格式不一（有些無區碼）導致 normalize 結果碼數不同
+        phone_to_clinic = {c.phone_normalized: c for c in clinics if c.phone_normalized}
 
         uploaded_phones = {u['phone_n'] for u in uploaded if u['phone_n']}
 
