@@ -661,25 +661,25 @@
                 </div>
                 <select class="filter-select" id="filterRegion">
                     <option value="">請選擇地區</option>
-                    <option value="臺北市">臺北市</option>
+                    <option value="台北市">台北市</option>
                     <option value="新北市">新北市</option>
+                    <option value="基隆市">基隆市</option>
                     <option value="桃園市">桃園市</option>
                     <option value="新竹市">新竹市</option>
                     <option value="新竹縣">新竹縣</option>
                     <option value="苗栗縣">苗栗縣</option>
-                    <option value="臺中市">臺中市</option>
+                    <option value="台中市">台中市</option>
                     <option value="彰化縣">彰化縣</option>
                     <option value="南投縣">南投縣</option>
                     <option value="雲林縣">雲林縣</option>
                     <option value="嘉義市">嘉義市</option>
                     <option value="嘉義縣">嘉義縣</option>
-                    <option value="臺南市">臺南市</option>
+                    <option value="台南市">台南市</option>
                     <option value="高雄市">高雄市</option>
                     <option value="屏東縣">屏東縣</option>
-                    <option value="基隆市">基隆市</option>
                     <option value="宜蘭縣">宜蘭縣</option>
                     <option value="花蓮縣">花蓮縣</option>
-                    <option value="臺東縣">臺東縣</option>
+                    <option value="台東縣">台東縣</option>
                 </select>
                 <select class="filter-select" id="filterSpecialty">
                     <option value="">請選擇科別</option>
@@ -699,6 +699,7 @@
                     <option value="泌尿科">泌尿科</option>
                     <option value="牙科">牙科</option>
                     <option value="眼科">眼科</option>
+                    <option value="產後護理之家">產後護理之家</option>
                     <option value="其他">其他</option>
                 </select>
                 <select class="filter-select" id="filterColItem">
@@ -758,25 +759,25 @@
                     <label>縣市 *</label>
                     <select id="region" required>
                         <option value="">請選擇縣市</option>
-                        <option value="臺北市">臺北市</option>
+                        <option value="台北市">台北市</option>
                         <option value="新北市">新北市</option>
+                        <option value="基隆市">基隆市</option>
                         <option value="桃園市">桃園市</option>
                         <option value="新竹市">新竹市</option>
                         <option value="新竹縣">新竹縣</option>
                         <option value="苗栗縣">苗栗縣</option>
-                        <option value="臺中市">臺中市</option>
+                        <option value="台中市">台中市</option>
                         <option value="彰化縣">彰化縣</option>
                         <option value="南投縣">南投縣</option>
                         <option value="雲林縣">雲林縣</option>
                         <option value="嘉義市">嘉義市</option>
                         <option value="嘉義縣">嘉義縣</option>
-                        <option value="臺南市">臺南市</option>
+                        <option value="台南市">台南市</option>
                         <option value="高雄市">高雄市</option>
                         <option value="屏東縣">屏東縣</option>
-                        <option value="基隆市">基隆市</option>
                         <option value="宜蘭縣">宜蘭縣</option>
                         <option value="花蓮縣">花蓮縣</option>
-                        <option value="臺東縣">臺東縣</option>
+                        <option value="台東縣">台東縣</option>
                     </select>
                 </div>
 
@@ -813,14 +814,19 @@
                         <label><input type="checkbox" value="耳鼻喉科"> 耳鼻喉科</label>
                         <label><input type="checkbox" value="內科"> 內科</label>
                         <label><input type="checkbox" value="外科"> 外科</label>
-                        <label><input type="checkbox" value="醫美"> 醫美</label>
                         <label><input type="checkbox" value="皮膚科"> 皮膚科</label>
                         <label><input type="checkbox" value="婦產科"> 婦產科</label>
-                        <label><input type="checkbox" value="泌尿科"> 泌尿科</label>
                         <label><input type="checkbox" value="復健/骨科"> 復健/骨科</label>
-                        <label><input type="checkbox" value="牙科"> 牙科</label>
                         <label><input type="checkbox" value="中醫"> 中醫</label>
+                        <label><input type="checkbox" value="內兒科"> 內兒科</label>
+                        <label><input type="checkbox" value="神經科"> 神經科</label>
+                        <label><input type="checkbox" value="精神科"> 精神科</label>
+                        <label><input type="checkbox" value="身心科"> 身心科</label>
+                        <label><input type="checkbox" value="泌尿科"> 泌尿科</label>
+                        <label><input type="checkbox" value="牙科"> 牙科</label>
+                        <label><input type="checkbox" value="眼科"> 眼科</label>
                         <label><input type="checkbox" value="產後護理之家"> 產後護理之家</label>
+                        <label><input type="checkbox" value="其他"> 其他</label>
                     </div>
                 </div>
 
@@ -1229,6 +1235,18 @@
             document.getElementById('clinicModal').style.display = 'block';
         }
 
+        // 縣市簡寫 / 臺字體 → 標準選項對應表
+        function normalizeRegion(raw) {
+            const map = {
+                '臺北市': '台北市', '台北': '台北市', '北市': '台北市',
+                '臺中市': '台中市', '台中': '台中市', '中市': '台中市',
+                '臺南市': '台南市', '台南': '台南市', '南市': '台南市',
+                '臺東縣': '台東縣', '台東': '台東縣',
+                '高市':   '高雄市', '高雄': '高雄市',
+            };
+            return map[raw] || raw;
+        }
+
         async function editClinic(id) {
             currentEditId = id;
             document.getElementById('modalTitle').textContent = '編輯診所';
@@ -1240,7 +1258,8 @@
 
                 if (clinic) {
                     document.getElementById('clinicId').value = clinic.id;
-                    document.getElementById('region').value = clinic.region || '';
+                    // 縣市：先正規化簡寫／臺字體，再對應下拉選項
+                    document.getElementById('region').value = normalizeRegion(clinic.region || '');
                     document.getElementById('district').value = clinic.district || '';
                     document.getElementById('name').value = clinic.name || '';
                     document.getElementById('address').value = clinic.address || '';
@@ -1249,8 +1268,10 @@
                     document.getElementById('businessHours').value = clinic.business_hours || '';
                     document.getElementById('note').value = clinic.note || '';
 
-                    // 科別勾選
-                    const specialties = clinic.specialties ? clinic.specialties.split(',').map(s => s.trim()) : [];
+                    // 科別勾選（DB 以 / 分隔，先清空再勾選）
+                    const specialties = clinic.specialties
+                        ? clinic.specialties.split('/').map(s => s.trim())
+                        : [];
                     document.querySelectorAll('#specialtyGroup input[type="checkbox"]').forEach(cb => {
                         cb.checked = specialties.includes(cb.value);
                     });
