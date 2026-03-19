@@ -719,13 +719,15 @@ def campaign_match():
         for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
             if not any(row):
                 continue
-            phone_raw = _get(row, '電話')
+            phone_raw  = _get(row, '電話')
+            region_val = _get(row, '縣市')
+            phone_fmt  = format_phone(phone_raw, region_val or None)  # 先補區碼
             uploaded.append({
-                'region':   _get(row, '縣市'),
+                'region':   region_val,
                 'district': _get(row, '區域'),
                 'name':     _get(row, '診所名稱'),
                 'phone':    phone_raw,
-                'phone_n':  _normalize_phone(phone_raw),
+                'phone_n':  _normalize_phone(phone_fmt),              # 再 normalize → 完整含區碼數字
             })
 
         clinics = Clinic.query.all()
