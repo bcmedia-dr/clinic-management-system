@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from export import export_clinics
 from import_data import import_clinics, import_health_mall
 from import_custom import import_custom_clinics
+from phone_utils import format_phone
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback-only-for-local')
@@ -291,22 +292,46 @@ def get_stats():
 def search_clinics_for_hm():
     """供健康醫購新增時，從診所總表搜尋帶入資料"""
     q = request.args.get('q', '').strip()
-    query = Clinic.query
-    if q:
-        query = query.filter(
+
+    def _to_brief(c):
+        return {
+            'id':             c.id,
+            'region':         c.region or '',
+            'district':       c.district or '',
+            'name':           c.name or '',
+            'phone':          c.phone or '',
+            'contact_person': c.contact_person or '',
+            'specialties':    c.specialties or '',
+            'address':        c.address or '',
+        }
+
+    if not q:
+        clinics = Clinic.query.order_by(Clinic.name).limit(30).all()
+        return jsonify([_to_brief(c) for c in clinics])
+
+    q_digits = _normalize_phone(q)  # 純數字版搜尋字
+    # 判斷是否像電話號碼：只含數字、空格、破折號，且至少 6 位數字
+    is_phone_query = (
+        bool(q_digits) and
+        len(q_digits) >= 6 and
+        bool(re.match(r'^[\d\s\-]+$', q))
+    )
+
+    if is_phone_query:
+        # 電話搜尋：雙邊都 normalize 後做子字串比對，解決新舊格式不一致問題
+        # （格式化後 DB 存 "02-2876-6955"，使用者可能搜 "0228766955"，需對齊）
+        all_clinics = Clinic.query.order_by(Clinic.name).all()
+        clinics = [
+            c for c in all_clinics
+            if (q in (c.name or '')) or
+               (c.phone and q_digits in _normalize_phone(c.phone))
+        ][:30]
+    else:
+        clinics = Clinic.query.filter(
             Clinic.name.contains(q) | Clinic.phone.contains(q)
-        )
-    clinics = query.order_by(Clinic.name).limit(30).all()
-    return jsonify([{
-        'id':             c.id,
-        'region':         c.region or '',
-        'district':       c.district or '',
-        'name':           c.name or '',
-        'phone':          c.phone or '',
-        'contact_person': c.contact_person or '',
-        'specialties':    c.specialties or '',
-        'address':        c.address or '',
-    } for c in clinics])
+        ).order_by(Clinic.name).limit(30).all()
+
+    return jsonify([_to_brief(c) for c in clinics])
 
 
 # ── 健康醫購 API ─────────────────────────────────────────────
@@ -998,7 +1023,7 @@ def import_campaign_clinics(campaign_id):
                     name          =name,
                     specialties   =_resolve(row, '科別') or None,
                     address       =_resolve(row, '地址', '院址') or None,
-                    phone         =phone_raw,
+                    phone         =format_phone(phone_raw, _resolve(row, '縣市') or None),
                     contact_person=_resolve(row, '負責人', '聯絡人') or None,
                     note          =extracted_note or None,
                 )
@@ -1238,7 +1263,7 @@ def import_baiwei():
                     district =_get(row, '區域') or None,
                     name     =name,
                     address  =_get(row, '地址') or None,
-                    phone    =phone_raw,
+                    phone    =format_phone(phone_raw, _get(row, '縣市') or None),
                     note     =extracted_note or None,
                 )
                 db.session.add(clinic)
@@ -1254,7 +1279,7 @@ def import_baiwei():
                 region      =_get(row, '縣市') or clinic.region,
                 district    =_get(row, '區域') or clinic.district,
                 address     =_get(row, '地址') or clinic.address,
-                phone       =phone_raw,
+                phone       =format_phone(phone_raw, _get(row, '縣市') or clinic.region or None),
                 doctor_name =doctor_name,
                 specialty   =_get(row, '科別') or None,
             )

@@ -1,6 +1,7 @@
 from openpyxl import load_workbook
 from datetime import datetime
 import re
+from phone_utils import format_phone
 
 
 def _normalize_phone(phone):
@@ -50,6 +51,8 @@ def import_clinics(file_path, db, Clinic):
 
                 phone_str  = str(phone) if phone else ''
                 normalized = _normalize_phone(phone_str)
+                region_str = str(region).strip() if region else None
+                phone_fmt  = format_phone(phone_str, region_str)
 
                 if normalized and normalized in existing_phones:
                     skipped_count += 1
@@ -62,7 +65,7 @@ def import_clinics(file_path, db, Clinic):
                     name=name,
                     specialties=specialties,
                     address=address,
-                    phone=phone_str,
+                    phone=phone_fmt,
                     contact_person=contact_person,
                 )
                 db.session.add(clinic)
@@ -133,6 +136,7 @@ def import_health_mall(file_path, db, HealthMall):
 
                 phone_str  = _get('電話')
                 normalized = _normalize_phone(phone_str)
+                phone_fmt  = format_phone(phone_str, _get('縣市') or None)
 
                 if normalized and normalized in existing_phones:
                     skipped_count += 1
@@ -155,7 +159,7 @@ def import_health_mall(file_path, db, HealthMall):
                     name           = name,
                     specialties    = _get('科別'),
                     address        = _get('地址'),
-                    phone          = phone_str,
+                    phone          = phone_fmt,
                     contact_person = _get('負責人'),
                     status         = status,
                     start_date     = start_date,

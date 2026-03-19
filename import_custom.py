@@ -1,15 +1,11 @@
 from openpyxl import load_workbook
 import re
+from phone_utils import format_phone
 
 
 def _normalize_phone(phone):
     """移除所有非數字字元，用於重複比對"""
     return re.sub(r'\D', '', str(phone)) if phone else ''
-
-
-def _clean_phone(phone):
-    """移除所有非數字和破折號的字元，用於儲存"""
-    return re.sub(r'[^\d\-]', '', str(phone)).strip() if phone else ''
 
 
 def _parse_name(raw_name):
@@ -97,9 +93,9 @@ def import_custom_clinics(file_path, db, Clinic):
                     error_details.append(f'第{row_num}列：清理後院名為空（原始值：{raw_name}）')
                     continue
 
-                phone_raw   = _get(row, '電話')
-                phone_clean = _clean_phone(phone_raw)
-                normalized  = _normalize_phone(phone_raw)
+                phone_raw  = _get(row, '電話')
+                normalized = _normalize_phone(phone_raw)
+                phone_fmt  = format_phone(phone_raw, _get(row, '縣市') or None)
 
                 if normalized and normalized in existing_phones:
                     skipped_count += 1
@@ -112,7 +108,7 @@ def import_custom_clinics(file_path, db, Clinic):
                     name           = name,
                     specialties    = _get(row, '科別') or None,
                     address        = _get(row, '院址') or None,
-                    phone          = phone_clean or None,
+                    phone          = phone_fmt or None,
                     contact_person = _get(row, '聯絡人') or None,
                     note           = extracted_note or None,
                 )
