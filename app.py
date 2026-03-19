@@ -294,6 +294,64 @@ def get_stats():
     total = Clinic.query.count()
     return jsonify({'total': total})
 
+@app.route('/api/clinics/duplicates')
+def get_clinic_duplicates():
+    """
+    找出可能重複的診所：
+    1. 診所名稱完全相同
+    2. 去除「診所/醫院/醫學中心/聯合/附設」後名稱相同（相似）
+    """
+    from collections import defaultdict
+    import re as _re
+
+    all_clinics = Clinic.query.order_by(Clinic.id).all()
+
+    # ── 1. 完全相同 ──────────────────────────────────────
+    name_groups = defaultdict(list)
+    for c in all_clinics:
+        if c.name:
+            name_groups[c.name.strip()].append(c)
+
+    exact = []
+    for name, clinics in name_groups.items():
+        if len(clinics) > 1:
+            exact.append({
+                'name':   name,
+                'count':  len(clinics),
+                'clinics': [{'id': c.id, 'name': c.name, 'phone': c.phone or '',
+                              'region': c.region or '', 'district': c.district or ''} for c in clinics],
+            })
+
+    # ── 2. 名稱相似（去除常見後綴詞後相同）────────────────
+    def simplify(name):
+        s = _re.sub(r'診所|醫院|醫學中心|聯合|附設|小兒科|家醫科|耳鼻喉科|內科|外科|皮膚科|婦產科|中醫', '', name or '')
+        return s.strip()
+
+    simplified_groups = defaultdict(list)
+    for c in all_clinics:
+        if c.name:
+            s = simplify(c.name)
+            if s:  # 去除後不為空才歸類
+                simplified_groups[s].append(c)
+
+    similar = []
+    exact_names = {g['name'] for g in exact}  # 完全相同的組別不再重複顯示
+    for simplified, clinics in simplified_groups.items():
+        if len(clinics) > 1:
+            names = {c.name for c in clinics}
+            # 跳過：所有名稱完全相同（已在 exact 組），或只有一種名稱但本來就在 exact
+            if len(names) == 1 and list(names)[0] in exact_names:
+                continue
+            similar.append({
+                'simplified': simplified,
+                'count':      len(clinics),
+                'clinics':    [{'id': c.id, 'name': c.name, 'phone': c.phone or '',
+                                'region': c.region or '', 'district': c.district or ''} for c in clinics],
+            })
+
+    return jsonify({'exact': exact, 'similar': similar})
+
+
 @app.route('/api/clinics/search')
 def search_clinics_for_hm():
     """供健康醫購新增時，從診所總表搜尋帶入資料"""

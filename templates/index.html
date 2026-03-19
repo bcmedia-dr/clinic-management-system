@@ -714,6 +714,7 @@
                 <button class="btn-export" onclick="exportData()">📥 匯出 Excel</button>
                 <button class="btn-import" onclick="showImportModal()">📤 匯入 Excel</button>
                 <button class="btn-import" onclick="showCustomImportModal()" style="background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);">📋 匯入自訂格式</button>
+                <button class="btn-import" onclick="showDuplicatesModal()" style="background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);">🔍 排查重複</button>
             </div>
         </div>
 
@@ -910,6 +911,19 @@
             </div>
             <button class="btn-submit" onclick="uploadFile()">開始匯入</button>
             <div id="importResult" style="margin-top: 20px; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 排查重複 Modal -->
+    <div class="modal" id="duplicatesModal" style="display:none;">
+        <div class="modal-content" style="max-width:780px;">
+            <div class="modal-header">
+                <h2>🔍 排查重複診所</h2>
+                <button class="close-btn" onclick="closeDuplicatesModal()">&times;</button>
+            </div>
+            <div id="duplicatesContent" style="min-height:80px;">
+                <p style="color:#999;text-align:center;padding:30px;">載入中...</p>
+            </div>
         </div>
     </div>
 
@@ -1503,6 +1517,108 @@
                 }
             } catch (error) {
                 alert('匯入失敗：' + error);
+            }
+        }
+
+        // ── 排查重複 ─────────────────────────────────────────────
+
+        function showDuplicatesModal() {
+            document.getElementById('duplicatesModal').style.display = 'block';
+            loadDuplicates();
+        }
+
+        function closeDuplicatesModal() {
+            document.getElementById('duplicatesModal').style.display = 'none';
+        }
+
+        async function loadDuplicates() {
+            const content = document.getElementById('duplicatesContent');
+            content.innerHTML = '<p style="color:#999;text-align:center;padding:30px;">載入中...</p>';
+            try {
+                const res = await fetch('/api/clinics/duplicates');
+                const data = await res.json();
+                renderDuplicates(data);
+            } catch(e) {
+                content.innerHTML = `<p style="color:red;text-align:center;padding:20px;">載入失敗：${e.message}</p>`;
+            }
+        }
+
+        function renderDupGroup(groupLabel, clinics, showName) {
+            // 渲染單一重複組（每筆顯示名稱、縣市/區域、電話、刪除按鈕）
+            let html = `<div style="border:1px solid #eee;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+                <div style="font-weight:600;color:#333;margin-bottom:8px;">
+                    ${groupLabel}
+                    <span style="color:#999;font-size:13px;font-weight:400;">（共 ${clinics.length} 筆）</span>
+                </div>`;
+            clinics.forEach(c => {
+                html += `<div style="display:flex;align-items:center;justify-content:space-between;
+                                     padding:7px 0;border-top:1px solid #f5f5f5;">
+                    <div style="font-size:14px;">
+                        ${showName ? `<strong>${c.name}</strong>　` : ''}
+                        <span style="color:#555;">${c.region}${c.district}</span>
+                        <span style="color:#999;margin-left:10px;">${c.phone || '（無電話）'}</span>
+                        <span style="color:#bbb;font-size:12px;margin-left:6px;">id:${c.id}</span>
+                    </div>
+                    <button onclick="deleteDuplicateClinic(${c.id})"
+                            style="background:#e74c3c;color:white;border:none;border-radius:6px;
+                                   padding:4px 14px;cursor:pointer;font-size:13px;flex-shrink:0;">
+                        刪除
+                    </button>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function renderDuplicates(data) {
+            const content = document.getElementById('duplicatesContent');
+            const { exact, similar } = data;
+
+            if (exact.length === 0 && similar.length === 0) {
+                content.innerHTML = '<p style="text-align:center;color:#27ae60;font-size:16px;padding:40px;">✅ 沒有發現重複診所</p>';
+                return;
+            }
+
+            let html = '';
+
+            // 完全相同區塊
+            html += `<h3 style="color:#e74c3c;margin:0 0 10px;">名稱完全相同（${exact.length} 組）</h3>`;
+            if (exact.length === 0) {
+                html += '<p style="color:#999;margin-bottom:20px;">無</p>';
+            } else {
+                exact.forEach(g => {
+                    html += renderDupGroup(g.name, g.clinics, false);
+                });
+            }
+
+            // 名稱相似區塊
+            html += `<h3 style="color:#e67e22;margin:20px 0 10px;">名稱相似（${similar.length} 組）</h3>`;
+            if (similar.length === 0) {
+                html += '<p style="color:#999;">無</p>';
+            } else {
+                similar.forEach(g => {
+                    html += renderDupGroup(`關鍵詞：${g.simplified}`, g.clinics, true);
+                });
+            }
+
+            content.innerHTML = html;
+        }
+
+        async function deleteDuplicateClinic(id) {
+            if (!confirm('確定刪除這筆診所？此操作無法復原。')) return;
+            try {
+                const res = await fetch(`/api/clinics/${id}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    // 重新載入重複列表和總表
+                    loadDuplicates();
+                    loadClinics();
+                    loadStats();
+                } else {
+                    alert('刪除失敗：' + (result.error || '未知錯誤'));
+                }
+            } catch(e) {
+                alert('刪除失敗：' + e.message);
             }
         }
     </script>
