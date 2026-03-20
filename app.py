@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, date
-import os, re
+import os, re, math
 from collections import Counter
 from io import BytesIO
 from openpyxl import Workbook, load_workbook
@@ -203,50 +203,91 @@ def audit_log_page():
 
 @app.route('/api/clinics', methods=['GET'])
 def get_clinics():
-    search    = request.args.get('search', '')
-    region    = request.args.get('region', '')
-    specialty = request.args.get('specialty', '')
-    col_item  = request.args.get('col_item', '')
+    """列出診所（分頁 + 資料庫層篩選）"""
+    page        = max(1, request.args.get('page',     1,  type=int))
+    per_page    = min(500, max(1, request.args.get('per_page', 50, type=int)))
+    search      = request.args.get('search',      '').strip()
+    city        = request.args.get('city',        '').strip()  # 縣市篩選
+    specialty   = request.args.get('specialty',   '').strip()
+    cooperation = request.args.get('cooperation', '').strip()  # 合作項目篩選
 
     # 只顯示未軟刪除的診所
     query = Clinic.query.filter(Clinic.status != 'deleted')
 
     if search:
+        # 搜尋診所名稱或電話
         query = query.filter(
             (Clinic.name.contains(search)) |
-            (Clinic.contact_person.contains(search))
+            (Clinic.phone.contains(search))
         )
-    if region:
-        query = query.filter(Clinic.region == region)
+    if city:
+        query = query.filter(Clinic.region == city)
     if specialty:
         query = query.filter(Clinic.specialties.contains(specialty))
-    if col_item == 'yaodai':
+    if cooperation == 'yaodai':
         query = query.filter(Clinic.col_yaodai == True)
-    elif col_item == 'haibao':
+    elif cooperation == 'haibao':
         query = query.filter(Clinic.col_haibao == True)
-    elif col_item == 'paiyang':
+    elif cooperation == 'paiyang':
         query = query.filter(Clinic.col_paiyang == True)
-    elif col_item == 'baiwei':
+    elif cooperation == 'baiwei':
         query = query.filter(Clinic.col_baiwei == True)
 
-    clinics = query.all()
-    return jsonify([{
+    # 先算總筆數，再做分頁切片
+    total       = query.count()
+    total_pages = max(1, math.ceil(total / per_page))
+    page        = min(page, total_pages)  # 防止超出頁數
+    clinics     = query.order_by(Clinic.id).offset((page - 1) * per_page).limit(per_page).all()
+
+    def _fmt(c):
+        return {
+            'id':             c.id,
+            'region':         c.region,
+            'district':       c.district,
+            'name':           c.name,
+            'col_yaodai':     c.col_yaodai  or False,
+            'col_haibao':     c.col_haibao  or False,
+            'col_paiyang':    c.col_paiyang or False,
+            'col_baiwei':     c.col_baiwei  or False,
+            'specialties':    c.specialties,
+            'address':        c.address,
+            'phone':          c.phone,
+            'contact_person': c.contact_person,
+            'business_hours': c.business_hours,
+            'note':           c.note,
+            'created_at':     c.created_at.strftime('%Y-%m-%d %H:%M:%S') if c.created_at else None,
+        }
+
+    return jsonify({
+        'clinics':     [_fmt(c) for c in clinics],
+        'total':       total,
+        'page':        page,
+        'per_page':    per_page,
+        'total_pages': total_pages,
+    })
+
+
+@app.route('/api/clinics/<int:clinic_id>', methods=['GET'])
+def get_clinic(clinic_id):
+    """取得單筆診所資料（供編輯 modal 使用）"""
+    c = Clinic.query.get_or_404(clinic_id)
+    return jsonify({
         'id':             c.id,
         'region':         c.region,
         'district':       c.district,
         'name':           c.name,
-        'col_yaodai':     c.col_yaodai or False,
-        'col_haibao':     c.col_haibao or False,
+        'col_yaodai':     c.col_yaodai  or False,
+        'col_haibao':     c.col_haibao  or False,
         'col_paiyang':    c.col_paiyang or False,
-        'col_baiwei':     c.col_baiwei or False,
+        'col_baiwei':     c.col_baiwei  or False,
         'specialties':    c.specialties,
         'address':        c.address,
         'phone':          c.phone,
         'contact_person': c.contact_person,
         'business_hours': c.business_hours,
         'note':           c.note,
-        'created_at':     c.created_at.strftime('%Y-%m-%d %H:%M:%S') if c.created_at else None
-    } for c in clinics])
+        'created_at':     c.created_at.strftime('%Y-%m-%d %H:%M:%S') if c.created_at else None,
+    })
 
 @app.route('/api/clinics', methods=['POST'])
 def create_clinic():
@@ -738,30 +779,30 @@ def get_taiwan_map_data():
 
 @app.route('/api/export', methods=['GET'])
 def export_data():
-    search    = request.args.get('search', '')
-    region    = request.args.get('region', '')
-    specialty = request.args.get('specialty', '')
-    col_item  = request.args.get('col_item', '')
+    search      = request.args.get('search',      '').strip()
+    city        = request.args.get('city',        '').strip()   # 新參數名
+    specialty   = request.args.get('specialty',   '').strip()
+    cooperation = request.args.get('cooperation', '').strip()   # 新參數名
 
     # 匯出只含未軟刪除的診所
     query = Clinic.query.filter(Clinic.status != 'deleted')
     if search:
         query = query.filter(
             Clinic.name.contains(search) |
-            Clinic.address.contains(search) |
+            Clinic.phone.contains(search) |
             Clinic.contact_person.contains(search)
         )
-    if region:
-        query = query.filter(Clinic.region == region)
+    if city:
+        query = query.filter(Clinic.region == city)
     if specialty:
         query = query.filter(Clinic.specialties.contains(specialty))
-    if col_item == 'yaodai':
+    if cooperation == 'yaodai':
         query = query.filter(Clinic.col_yaodai == True)
-    elif col_item == 'haibao':
+    elif cooperation == 'haibao':
         query = query.filter(Clinic.col_haibao == True)
-    elif col_item == 'paiyang':
+    elif cooperation == 'paiyang':
         query = query.filter(Clinic.col_paiyang == True)
-    elif col_item == 'baiwei':
+    elif cooperation == 'baiwei':
         query = query.filter(Clinic.col_baiwei == True)
 
     clinics = query.all()

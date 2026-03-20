@@ -968,9 +968,10 @@
     <script>
         let currentEditId = null;
         let _searchTimer = null;
-        let allClinics = [];
-        let currentPage = 1;
-        const PAGE_SIZE = 50;
+        let currentPage = 1;          // 目前頁碼（伺服器端分頁）
+        let _totalPages  = 1;         // 由 API 回傳的總頁數
+        let _total       = 0;         // 由 API 回傳的總筆數
+        const PAGE_SIZE  = 50;        // 每頁筆數（與 API per_page 同步）
 
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
@@ -1057,42 +1058,53 @@
 
         function getFilters() {
             return {
-                search: document.getElementById('searchInput').value,
-                region: document.getElementById('filterRegion').value,
-                specialty: document.getElementById('filterSpecialty').value,
-                colItem: document.getElementById('filterColItem').value,
+                search:      document.getElementById('searchInput').value,
+                city:        document.getElementById('filterRegion').value,
+                specialty:   document.getElementById('filterSpecialty').value,
+                cooperation: document.getElementById('filterColItem').value,
             };
         }
 
-        function buildParams(filters) {
+        // 組合 API 查詢參數（分頁 + 篩選）
+        function buildParams(filters, page) {
             const params = new URLSearchParams();
-            if (filters.search) params.append('search', filters.search);
-            if (filters.region) params.append('region', filters.region);
-            if (filters.specialty) params.append('specialty', filters.specialty);
-            if (filters.colItem) params.append('col_item', filters.colItem);
+            if (filters.search)      params.append('search',      filters.search);
+            if (filters.city)        params.append('city',        filters.city);
+            if (filters.specialty)   params.append('specialty',   filters.specialty);
+            if (filters.cooperation) params.append('cooperation', filters.cooperation);
+            if (page)                params.append('page',        page);
+            params.append('per_page', PAGE_SIZE);
             return params;
         }
 
         async function loadStats() {
             try {
+                // 用 per_page=1 只取 total，避免傳輸大量資料
                 const filters = getFilters();
-                const params = buildParams(filters);
+                const params  = new URLSearchParams();
+                if (filters.search)      params.append('search',      filters.search);
+                if (filters.city)        params.append('city',        filters.city);
+                if (filters.specialty)   params.append('specialty',   filters.specialty);
+                if (filters.cooperation) params.append('cooperation', filters.cooperation);
+                params.append('per_page', 1);
+                params.append('page', 1);
+
                 const response = await fetch(`/api/clinics?${params}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const clinics = await response.json();
+                const data = await response.json();
+                const total = data.total;
 
-                document.getElementById('totalCount').textContent = clinics.length;
+                document.getElementById('totalCount').textContent = total;
 
                 // 合作項目計數卡：選了才顯示數量
-                const colItemSelect = document.getElementById('filterColItem');
-                const colItemCard = document.getElementById('colItemStatCard');
+                const colItemCard  = document.getElementById('colItemStatCard');
                 const colItemLabel = document.getElementById('colItemStatLabel');
                 const colItemValue = document.getElementById('colItemStatValue');
                 const colItemNames = { yaodai: '藥袋', haibao: '海報/立牌', paiyang: '派樣', baiwei: '百位' };
 
-                if (filters.colItem) {
-                    colItemLabel.textContent = colItemNames[filters.colItem] || filters.colItem;
-                    colItemValue.textContent = clinics.length + ' 間';
+                if (filters.cooperation) {
+                    colItemLabel.textContent = colItemNames[filters.cooperation] || filters.cooperation;
+                    colItemValue.textContent = total + ' 間';
                     colItemCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
                     colItemCard.style.color = 'white';
                 } else {
@@ -1103,13 +1115,13 @@
                 }
 
                 // 科別計數卡：選了才顯示數量
-                const specialtyCard = document.getElementById('specialtyStatCard');
+                const specialtyCard  = document.getElementById('specialtyStatCard');
                 const specialtyLabel = document.getElementById('specialtyStatLabel');
                 const specialtyValue = document.getElementById('specialtyStatValue');
 
                 if (filters.specialty) {
                     specialtyLabel.textContent = filters.specialty;
-                    specialtyValue.textContent = clinics.length + ' 間';
+                    specialtyValue.textContent = total + ' 間';
                     specialtyCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
                     specialtyCard.style.color = 'white';
                 } else {
@@ -1124,32 +1136,33 @@
         }
 
         function applyFilters() {
+            // 篩選條件變更時重置到第一頁，再重新載入
+            currentPage = 1;
             loadClinics();
             loadStats();
         }
 
         async function loadClinics() {
             try {
-                const filters = getFilters();
-                const params = buildParams(filters);
+                const filters  = getFilters();
+                const params   = buildParams(filters, currentPage);
                 const response = await fetch(`/api/clinics?${params}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                allClinics = await response.json();
-                renderPage(1);
+                const data = await response.json();
+
+                // 從 API 回傳的分頁資訊更新全域狀態
+                _total      = data.total;
+                _totalPages = data.total_pages;
+                currentPage = data.page;
+
+                renderClinics(data.clinics, data.total, data.page, data.total_pages);
             } catch (error) {
                 console.error('載入診所失敗:', error);
                 alert('載入資料失敗: ' + error.message);
             }
         }
 
-        function renderPage(page) {
-            const total = allClinics.length;
-            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-            currentPage = Math.max(1, Math.min(page, totalPages));
-
-            const start = (currentPage - 1) * PAGE_SIZE;
-            const pageData = allClinics.slice(start, start + PAGE_SIZE);
-
+        function renderClinics(clinics, total, page, totalPages) {
             const tbody = document.getElementById('clinicsTable');
             tbody.innerHTML = '';
 
@@ -1159,7 +1172,10 @@
                 return;
             }
 
-            pageData.forEach((clinic, index) => {
+            // 計算本頁第一筆的序號（如第 2 頁第 1 筆 = 51）
+            const start = (page - 1) * PAGE_SIZE;
+
+            clinics.forEach((clinic, index) => {
                 const rowNum = start + index + 1;
 
                 const specialties = clinic.specialties
@@ -1224,20 +1240,23 @@
             });
 
             updateSelectAllState();
-            updatePagination(total);
+            updatePagination(total, page, totalPages);
         }
 
-        function updatePagination(total) {
-            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        function updatePagination(total, page, totalPages) {
             const bar = document.getElementById('paginationBar');
-            bar.style.display = total <= PAGE_SIZE ? 'none' : 'flex';
-            document.getElementById('btnPrev').disabled = currentPage <= 1;
-            document.getElementById('btnNext').disabled = currentPage >= totalPages;
+            bar.style.display = totalPages <= 1 ? 'none' : 'flex';
+            document.getElementById('btnPrev').disabled = page <= 1;
+            document.getElementById('btnNext').disabled = page >= totalPages;
             document.getElementById('pageInfo').textContent =
-                `第 ${currentPage} / ${totalPages} 頁（共 ${total} 筆）`;
+                `第 ${page} / ${totalPages} 頁（共 ${total} 筆）`;
         }
 
-        function goPage(page) { renderPage(page); }
+        function goPage(page) {
+            // 翻頁只重新向伺服器取該頁資料（不重置篩選）
+            currentPage = page;
+            loadClinics();
+        }
 
         async function toggleDetail(clinicId) {
             const detailRow = document.querySelector(`tr[data-detail-for="${clinicId}"]`);
@@ -1304,38 +1323,37 @@
             document.getElementById('modalTitle').textContent = '編輯診所';
 
             try {
-                const response = await fetch('/api/clinics');
-                const clinics = await response.json();
-                const clinic = clinics.find(c => c.id === id);
+                const response = await fetch(`/api/clinics/${id}`);
+                const clinic = await response.json();
 
-                if (clinic) {
-                    document.getElementById('clinicId').value = clinic.id;
-                    // 縣市：先正規化簡寫／臺字體，再對應下拉選項
-                    document.getElementById('region').value = normalizeRegion(clinic.region || '');
-                    document.getElementById('district').value = clinic.district || '';
-                    document.getElementById('name').value = clinic.name || '';
-                    document.getElementById('address').value = clinic.address || '';
-                    document.getElementById('phone').value = clinic.phone || '';
-                    document.getElementById('contactPerson').value = clinic.contact_person || '';
-                    document.getElementById('businessHours').value = clinic.business_hours || '';
-                    document.getElementById('note').value = clinic.note || '';
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-                    // 科別勾選（DB 以 / 分隔，先清空再勾選）
-                    const specialties = clinic.specialties
-                        ? clinic.specialties.split('/').map(s => s.trim())
-                        : [];
-                    document.querySelectorAll('#specialtyGroup input[type="checkbox"]').forEach(cb => {
-                        cb.checked = specialties.includes(cb.value);
-                    });
+                document.getElementById('clinicId').value = clinic.id;
+                // 縣市：先正規化簡寫／臺字體，再對應下拉選項
+                document.getElementById('region').value = normalizeRegion(clinic.region || '');
+                document.getElementById('district').value = clinic.district || '';
+                document.getElementById('name').value = clinic.name || '';
+                document.getElementById('address').value = clinic.address || '';
+                document.getElementById('phone').value = clinic.phone || '';
+                document.getElementById('contactPerson').value = clinic.contact_person || '';
+                document.getElementById('businessHours').value = clinic.business_hours || '';
+                document.getElementById('note').value = clinic.note || '';
 
-                    // 合作項目勾選
-                    document.getElementById('colYaodai').checked = clinic.col_yaodai || false;
-                    document.getElementById('colHaibao').checked = clinic.col_haibao || false;
-                    document.getElementById('colPaiyang').checked = clinic.col_paiyang || false;
-                    document.getElementById('colBaiwei').checked = clinic.col_baiwei || false;
+                // 科別勾選（DB 以 / 分隔，先清空再勾選）
+                const specialties = clinic.specialties
+                    ? clinic.specialties.split('/').map(s => s.trim())
+                    : [];
+                document.querySelectorAll('#specialtyGroup input[type="checkbox"]').forEach(cb => {
+                    cb.checked = specialties.includes(cb.value);
+                });
 
-                    document.getElementById('clinicModal').style.display = 'block';
-                }
+                // 合作項目勾選
+                document.getElementById('colYaodai').checked = clinic.col_yaodai || false;
+                document.getElementById('colHaibao').checked = clinic.col_haibao || false;
+                document.getElementById('colPaiyang').checked = clinic.col_paiyang || false;
+                document.getElementById('colBaiwei').checked = clinic.col_baiwei || false;
+
+                document.getElementById('clinicModal').style.display = 'block';
             } catch (error) {
                 console.error('載入診所資料失敗:', error);
                 alert('載入診所資料失敗');
