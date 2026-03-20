@@ -47,6 +47,8 @@ class Clinic(db.Model):
     col_haibao       = db.Column(db.Boolean, default=False)
     col_paiyang      = db.Column(db.Boolean, default=False)
     col_baiwei       = db.Column(db.Boolean, default=False)
+    status           = db.Column(db.String(20), default='active')   # 'active' | 'deleted'（軟刪除）
+    deleted_at       = db.Column(db.DateTime)                       # 軟刪除時間（status='deleted' 時才有值）
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at       = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -183,7 +185,8 @@ def get_clinics():
     specialty = request.args.get('specialty', '')
     col_item  = request.args.get('col_item', '')
 
-    query = Clinic.query
+    # 只顯示未軟刪除的診所
+    query = Clinic.query.filter(Clinic.status != 'deleted')
 
     if search:
         query = query.filter(
@@ -285,25 +288,66 @@ def update_clinic(clinic_id):
 
 @app.route('/api/clinics/<int:clinic_id>', methods=['DELETE'])
 def delete_clinic(clinic_id):
+    """軟刪除：只標記 status='deleted'，不實際刪除資料"""
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
     clinic = Clinic.query.get_or_404(clinic_id)
+    clinic.status     = 'deleted'
+    clinic.deleted_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'success': True})
 
-    # 先處理關聯資料，避免外鍵約束（FK）錯誤
-    # 1. campaign_clinic：clinic_id NOT NULL → 直接刪除關聯記錄
+
+@app.route('/api/clinics/<int:clinic_id>/restore', methods=['PUT'])
+def restore_clinic(clinic_id):
+    """還原軟刪除的診所"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    clinic = Clinic.query.get_or_404(clinic_id)
+    clinic.status     = 'active'
+    clinic.deleted_at = None
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/clinics/<int:clinic_id>/permanent', methods=['DELETE'])
+def permanent_delete_clinic(clinic_id):
+    """永久刪除：先清除關聯資料再真正刪除"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    clinic = Clinic.query.get_or_404(clinic_id)
+    # 1. campaign_clinic：clinic_id NOT NULL → 刪除關聯記錄
     CampaignClinic.query.filter_by(clinic_id=clinic_id).delete()
     # 2. baiwei_doctor：clinic_id nullable → 設為 NULL，保留百位醫師資料
     BaiweiDoctor.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
     # 3. health_mall：clinic_id nullable → 設為 NULL，保留健康醫購資料
     HealthMall.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
-
     db.session.delete(clinic)
     db.session.commit()
     return jsonify({'success': True})
 
+
+@app.route('/api/clinics/deleted', methods=['GET'])
+def get_deleted_clinics():
+    """查詢所有已軟刪除的診所"""
+    clinics = (Clinic.query
+               .filter(Clinic.status == 'deleted')
+               .order_by(Clinic.deleted_at.desc())
+               .all())
+    return jsonify([{
+        'id':         c.id,
+        'region':     c.region     or '',
+        'district':   c.district   or '',
+        'name':       c.name       or '',
+        'phone':      c.phone      or '',
+        'specialties': c.specialties or '',
+        'deleted_at': c.deleted_at.strftime('%Y-%m-%d %H:%M') if c.deleted_at else '',
+    } for c in clinics])
+
 @app.route('/api/stats')
 def get_stats():
-    total = Clinic.query.count()
+    # 只計算未軟刪除的診所
+    total = Clinic.query.filter(Clinic.status != 'deleted').count()
     return jsonify({'total': total})
 
 @app.route('/api/clinics/duplicates')
@@ -316,7 +360,7 @@ def get_clinic_duplicates():
     from collections import defaultdict
     import re as _re
 
-    all_clinics = Clinic.query.order_by(Clinic.id).all()
+    all_clinics = Clinic.query.filter(Clinic.status != 'deleted').order_by(Clinic.id).all()
 
     # ── 1. 完全相同 ──────────────────────────────────────
     name_groups = defaultdict(list)
@@ -382,7 +426,7 @@ def search_clinics_for_hm():
         }
 
     if not q:
-        clinics = Clinic.query.order_by(Clinic.name).limit(30).all()
+        clinics = Clinic.query.filter(Clinic.status != 'deleted').order_by(Clinic.name).limit(30).all()
         return jsonify([_to_brief(c) for c in clinics])
 
     q_digits = _normalize_phone(q)  # 純數字版搜尋字
@@ -396,7 +440,7 @@ def search_clinics_for_hm():
     if is_phone_query:
         # 電話搜尋：雙邊都 normalize 後做子字串比對，解決新舊格式不一致問題
         # （格式化後 DB 存 "02-2876-6955"，使用者可能搜 "0228766955"，需對齊）
-        all_clinics = Clinic.query.order_by(Clinic.name).all()
+        all_clinics = Clinic.query.filter(Clinic.status != 'deleted').order_by(Clinic.name).all()
         clinics = [
             c for c in all_clinics
             if (q in (c.name or '')) or
@@ -404,6 +448,8 @@ def search_clinics_for_hm():
         ][:30]
     else:
         clinics = Clinic.query.filter(
+            Clinic.status != 'deleted'
+        ).filter(
             Clinic.name.contains(q) | Clinic.phone.contains(q)
         ).order_by(Clinic.name).limit(30).all()
 
@@ -573,8 +619,8 @@ def export_health_mall():
 
 @app.route('/api/analytics/stats')
 def get_analytics_stats():
-    """整合統計 API：診所 + 健康醫購"""
-    clinics = Clinic.query.all()
+    """整合統計 API：診所 + 健康醫購（不含已軟刪除）"""
+    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
     hm_all  = HealthMall.query.all()
 
     # 診所總數與縣市分布
@@ -619,13 +665,13 @@ def get_analytics_stats():
 
 @app.route('/api/analytics/regions')
 def get_region_stats():
-    clinics = Clinic.query.all()
+    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
     region_count = Counter(c.region for c in clinics if c.region)
     return jsonify({'regions': list(region_count.keys()), 'counts': list(region_count.values())})
 
 @app.route('/api/analytics/specialties')
 def get_specialty_stats():
-    clinics = Clinic.query.all()
+    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
     specialty_list = []
     for clinic in clinics:
         if clinic.specialties:
@@ -635,7 +681,7 @@ def get_specialty_stats():
 
 @app.route('/api/analytics/taiwan_map')
 def get_taiwan_map_data():
-    clinics = Clinic.query.all()
+    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
     region_count = Counter(c.region for c in clinics if c.region)
     return jsonify([{'name': r, 'value': v} for r, v in region_count.items()])
 
@@ -649,7 +695,8 @@ def export_data():
     specialty = request.args.get('specialty', '')
     col_item  = request.args.get('col_item', '')
 
-    query = Clinic.query
+    # 匯出只含未軟刪除的診所
+    query = Clinic.query.filter(Clinic.status != 'deleted')
     if search:
         query = query.filter(
             Clinic.name.contains(search) |
@@ -808,7 +855,7 @@ def campaign_match():
                 'phone_n':  _normalize_phone(phone_fmt),              # 再 normalize → 完整含區碼數字
             })
 
-        clinics = Clinic.query.all()
+        clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
         # 用 phone_normalized 欄位建立比對表（已是 format_phone 後的完整含區碼數字）
         # 避免 c.phone 格式不一（有些無區碼）導致 normalize 結果碼數不同
         phone_to_clinic = {c.phone_normalized: c for c in clinics if c.phone_normalized}
@@ -1073,9 +1120,9 @@ def import_campaign_clinics(campaign_id):
                     return str(row[idx]).strip()
             return ''
 
-        # 建立電話 → 診所物件對應表（用 phone_normalized 為鍵）
+        # 建立電話 → 診所物件對應表（用 phone_normalized 為鍵，不含軟刪除）
         phone_to_clinic = {}
-        for c in Clinic.query.all():
+        for c in Clinic.query.filter(Clinic.status != 'deleted').all():
             if c.phone_normalized:
                 phone_to_clinic[c.phone_normalized] = c
 
@@ -1373,9 +1420,9 @@ def import_baiwei():
                     return str(row[idx]).strip()
             return ''
 
-        # 建立電話 → clinic 的快查表
+        # 建立電話 → clinic 的快查表（不含軟刪除）
         phone_to_clinic = {}
-        for c in Clinic.query.all():
+        for c in Clinic.query.filter(Clinic.status != 'deleted').all():
             np = _normalize_phone(c.phone)
             if np:
                 phone_to_clinic[np] = c
