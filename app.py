@@ -285,6 +285,15 @@ def delete_clinic(clinic_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
     clinic = Clinic.query.get_or_404(clinic_id)
+
+    # 先處理關聯資料，避免外鍵約束（FK）錯誤
+    # 1. campaign_clinic：clinic_id NOT NULL → 直接刪除關聯記錄
+    CampaignClinic.query.filter_by(clinic_id=clinic_id).delete()
+    # 2. baiwei_doctor：clinic_id nullable → 設為 NULL，保留百位醫師資料
+    BaiweiDoctor.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
+    # 3. health_mall：clinic_id nullable → 設為 NULL，保留健康醫購資料
+    HealthMall.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
+
     db.session.delete(clinic)
     db.session.commit()
     return jsonify({'success': True})
