@@ -1222,7 +1222,8 @@ def import_campaign_clinics(campaign_id):
         new_clinics_count = updated_count = recorded = already_in_campaign = 0
         errors = []
         processed_clinics = []  # 記錄本次處理過的診所，匯入後連動合作項目
-        preview = []  # 預覽清單（最多 10 筆）
+        preview_create = []  # 新增預覽（最多 5 筆）
+        preview_update = []  # 更新預覽（最多 5 筆）
 
         data_start_row = header_row_idx + 1
         consecutive_blank = 0  # 連續空白行計數器
@@ -1260,8 +1261,8 @@ def import_campaign_clinics(campaign_id):
                 if new_contact: clinic.contact_person = new_contact
                 updated_count += 1
                 clinic_name_for_preview = _resolve(row, '診所名稱', '院名')
-                if len(preview) < 10:
-                    preview.append({'name': clinic_name_for_preview, 'phone': phone_fmt, 'action': 'update', 'region': _resolve(row, '縣市')})
+                if len(preview_update) < 5:
+                    preview_update.append({'name': clinic_name_for_preview, 'phone': phone_fmt, 'action': 'update', 'region': _resolve(row, '縣市')})
             else:
                 raw_name = _resolve(row, '診所名稱', '院名')
                 if not raw_name:
@@ -1291,8 +1292,8 @@ def import_campaign_clinics(campaign_id):
                     db.session.flush()
                     phone_to_clinic[normalized] = clinic
                     new_clinics_count += 1
-                    if len(preview) < 10:
-                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': _resolve(row, '縣市')})
+                    if len(preview_create) < 5:
+                        preview_create.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': _resolve(row, '縣市')})
                 except IntegrityError:
                     # 並發情況：INSERT 失敗但 phone_to_clinic 未命中，改為更新
                     sp.rollback()
@@ -1302,8 +1303,8 @@ def import_campaign_clinics(campaign_id):
                         continue
                     phone_to_clinic[normalized] = clinic
                     updated_count += 1
-                    if len(preview) < 10:
-                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': _resolve(row, '縣市')})
+                    if len(preview_update) < 5:
+                        preview_update.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': _resolve(row, '縣市')})
 
             processed_clinics.append(clinic)
 
@@ -1338,7 +1339,7 @@ def import_campaign_clinics(campaign_id):
                 'would_update':        updated_count,
                 'would_skip':          already_in_campaign,
                 'errors':              errors,
-                'preview':             preview,
+                'preview':             preview_create + preview_update,
             })
 
         db.session.commit()

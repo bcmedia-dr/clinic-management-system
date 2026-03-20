@@ -75,7 +75,8 @@ def import_custom_clinics(file_path, db, Clinic, dry_run=False):
         updated_count  = 0
         error_count    = 0
         error_details  = []
-        preview        = []  # 預覽清單（最多 10 筆）
+        preview_create = []  # 新增預覽（最多 5 筆）
+        preview_update = []  # 更新預覽（最多 5 筆）
 
         consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -117,8 +118,8 @@ def import_custom_clinics(file_path, db, Clinic, dry_run=False):
                     if extracted_note:
                         existing.note = extracted_note
                     updated_count += 1
-                    if len(preview) < 10:
-                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': region_val})
+                    if len(preview_update) < 5:
+                        preview_update.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': region_val})
                     continue
 
                 clinic = Clinic(
@@ -140,8 +141,8 @@ def import_custom_clinics(file_path, db, Clinic, dry_run=False):
                     if normalized:
                         phone_to_existing[normalized] = clinic
                     imported_count += 1
-                    if len(preview) < 10:
-                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': region_val})
+                    if len(preview_create) < 5:
+                        preview_create.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': region_val})
                 except IntegrityError:
                     # 並發情況：INSERT 失敗但 phone_to_existing 未命中，改為更新
                     sp.rollback()
@@ -157,8 +158,8 @@ def import_custom_clinics(file_path, db, Clinic, dry_run=False):
                             existing.note = extracted_note
                         phone_to_existing[normalized] = existing
                         updated_count += 1
-                        if len(preview) < 10:
-                            preview.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': region_val})
+                        if len(preview_update) < 5:
+                            preview_update.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': region_val})
                     else:
                         error_count += 1
                         error_details.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
@@ -177,7 +178,7 @@ def import_custom_clinics(file_path, db, Clinic, dry_run=False):
                 'would_skip':   0,
                 'errors':       error_count,
                 'error_details': error_details,
-                'preview':      preview,
+                'preview':      preview_create + preview_update,
             }
 
         db.session.commit()
