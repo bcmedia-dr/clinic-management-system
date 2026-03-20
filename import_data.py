@@ -31,10 +31,15 @@ def import_clinics(file_path, db, Clinic):
         updated_count  = 0
         errors = []
 
+        consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             try:
                 if not any(row[:7]):
+                    consecutive_blank += 1
+                    if consecutive_blank >= 5:  # 連續5筆空白即停止，避免掃描百萬空白行
+                        break
                     continue
+                consecutive_blank = 0  # 有資料就重置
 
                 region         = row[0]
                 district       = row[1]

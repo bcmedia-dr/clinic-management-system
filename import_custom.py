@@ -75,10 +75,15 @@ def import_custom_clinics(file_path, db, Clinic):
         error_count    = 0
         error_details  = []
 
+        consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             try:
                 if not any(row):
+                    consecutive_blank += 1
+                    if consecutive_blank >= 5:  # 連續5筆空白即停止
+                        break
                     continue
+                consecutive_blank = 0  # 有資料就重置
 
                 raw_name = _get(row, '院名')
                 if not raw_name:

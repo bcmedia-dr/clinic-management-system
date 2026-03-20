@@ -786,9 +786,14 @@ def campaign_match():
             return str(row[idx]).strip() if row[idx] is not None else ''
 
         uploaded = []
+        consecutive_blank = 0  # 連續空白行計數器
         for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
             if not any(row):
+                consecutive_blank += 1
+                if consecutive_blank >= 5:  # 連續5筆空白即停止
+                    break
                 continue
+            consecutive_blank = 0  # 有資料就重置
             phone_raw  = _get(row, '電話')
             region_val = _get(row, '縣市')
             phone_fmt  = format_phone(phone_raw, region_val or None)  # 先補區碼
@@ -1079,9 +1084,14 @@ def import_campaign_clinics(campaign_id):
         processed_clinics = []  # 記錄本次處理過的診所，匯入後連動合作項目
 
         data_start_row = header_row_idx + 1
+        consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=data_start_row, values_only=True), start=data_start_row):
             if not any(row):
+                consecutive_blank += 1
+                if consecutive_blank >= 5:  # 連續5筆空白即停止
+                    break
                 continue
+            consecutive_blank = 0  # 有資料就重置
             phone_raw  = _resolve(row, '電話')
             phone_fmt  = format_phone(phone_raw, _resolve(row, '縣市') or None)  # 先補區碼
             normalized = _normalize_phone(phone_fmt)                              # 再正規化（含區碼的完整數字）
@@ -1353,9 +1363,14 @@ def import_baiwei():
         new_count = already_count = 0
         errors = []
 
+        consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True), start=header_row_idx + 1):
             if not any(row):
+                consecutive_blank += 1
+                if consecutive_blank >= 5:  # 連續5筆空白即停止
+                    break
                 continue
+            consecutive_blank = 0  # 有資料就重置
 
             phone_raw   = _get(row, '電話')
             doctor_name = _get(row, '醫師', '醫師名字')
