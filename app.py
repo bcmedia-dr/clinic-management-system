@@ -114,6 +114,23 @@ class BaiweiDoctor(db.Model):
     clinic = db.relationship('Clinic', backref=db.backref('baiwei_doctors', lazy=True))
 
 
+class AuditLog(db.Model):
+    """操作記錄：記錄診所的新增、編輯、刪除等操作"""
+    __tablename__ = 'audit_log'
+    id          = db.Column(db.Integer, primary_key=True)
+    action      = db.Column(db.String(20))    # '新增' / '編輯' / '刪除' / '永久刪除'
+    target_name = db.Column(db.String(200))   # 操作的診所名稱
+    target_id   = db.Column(db.Integer)       # 操作的診所 ID
+    detail      = db.Column(db.Text)          # 變更摘要（可空）
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+def _write_audit(action, name, target_id, detail=None):
+    """寫入一筆操作記錄（呼叫端需自行 commit）"""
+    log = AuditLog(action=action, target_name=name, target_id=target_id, detail=detail)
+    db.session.add(log)
+
+
 # ── 頁面路由 ────────────────────────────────────────────────
 
 @app.route('/')
@@ -174,6 +191,12 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+@app.route('/audit-log')
+def audit_log_page():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('audit_log.html')
 
 
 # ── 診所管理 API ─────────────────────────────────────────────
@@ -249,6 +272,8 @@ def create_clinic():
             note             = data.get('note')
         )
         db.session.add(clinic)
+        db.session.flush()  # 取得 clinic.id，尚未真正 commit
+        _write_audit('新增', clinic.name, clinic.id)
         db.session.commit()
         return jsonify({'success': True, 'id': clinic.id})
     except Exception as e:
@@ -277,6 +302,7 @@ def update_clinic(clinic_id):
         clinic.contact_person = data.get('contact_person')
         clinic.business_hours = data.get('business_hours')
         clinic.note           = data.get('note')
+        _write_audit('編輯', clinic.name, clinic_id)
         db.session.commit()
         return jsonify({'success': True})
     except IntegrityError:
@@ -294,6 +320,7 @@ def delete_clinic(clinic_id):
     clinic = Clinic.query.get_or_404(clinic_id)
     clinic.status     = 'deleted'
     clinic.deleted_at = datetime.utcnow()
+    _write_audit('刪除', clinic.name, clinic_id)
     db.session.commit()
     return jsonify({'success': True})
 
@@ -316,6 +343,7 @@ def permanent_delete_clinic(clinic_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
     clinic = Clinic.query.get_or_404(clinic_id)
+    clinic_name = clinic.name  # 先記錄名稱，因為刪除後無法取得
     # 1. campaign_clinic：clinic_id NOT NULL → 刪除關聯記錄
     CampaignClinic.query.filter_by(clinic_id=clinic_id).delete()
     # 2. baiwei_doctor：clinic_id nullable → 設為 NULL，保留百位醫師資料
@@ -323,6 +351,7 @@ def permanent_delete_clinic(clinic_id):
     # 3. health_mall：clinic_id nullable → 設為 NULL，保留健康醫購資料
     HealthMall.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
     db.session.delete(clinic)
+    _write_audit('永久刪除', clinic_name, clinic_id)
     db.session.commit()
     return jsonify({'success': True})
 
@@ -349,6 +378,25 @@ def get_stats():
     # 只計算未軟刪除的診所
     total = Clinic.query.filter(Clinic.status != 'deleted').count()
     return jsonify({'total': total})
+
+@app.route('/api/audit-log')
+def get_audit_log():
+    """查詢操作記錄，支援以 action 過濾"""
+    if 'user' not in session:
+        return jsonify({'error': '未登入'}), 401
+    action_filter = request.args.get('action', '').strip()
+    query = AuditLog.query
+    if action_filter:
+        query = query.filter(AuditLog.action == action_filter)
+    logs = query.order_by(AuditLog.created_at.desc()).limit(500).all()
+    return jsonify([{
+        'id':          l.id,
+        'action':      l.action      or '',
+        'target_name': l.target_name or '',
+        'target_id':   l.target_id,
+        'detail':      l.detail      or '',
+        'created_at':  l.created_at.strftime('%Y-%m-%d %H:%M:%S') if l.created_at else '',
+    } for l in logs])
 
 @app.route('/api/clinics/duplicates')
 def get_clinic_duplicates():

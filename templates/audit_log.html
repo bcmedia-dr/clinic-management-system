@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作記錄 — Bcmedia 診所管理系統</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
+
+        /* ── 頁首 ── */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .nav { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; }
+        .nav-btn {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 2px solid rgba(255,255,255,0.5);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.3); }
+        .nav-btn.active { background: white; color: #667eea; border-color: white; }
+        .btn-logout {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.5);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.35); }
+
+        /* ── 主內容 ── */
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .page-header h2 { font-size: 22px; font-weight: 700; color: #333; }
+
+        /* ── 過濾列 ── */
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .filter-label { font-size: 14px; color: #555; }
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+        .filter-select:focus { outline: none; border-color: #667eea; }
+        .btn-refresh {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-refresh:hover { background: #5a6fd6; }
+
+        /* ── 表格 ── */
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            overflow: hidden;
+        }
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .log-table th {
+            background: #f8f9ff;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 700;
+            color: #444;
+            border-bottom: 2px solid #e8ecff;
+        }
+        .log-table td {
+            padding: 11px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+        .log-table tr:last-child td { border-bottom: none; }
+        .log-table tr:hover td { background: #fafbff; }
+
+        /* ── 動作標籤 ── */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .badge-新增  { background: #d4edda; color: #155724; }
+        .badge-編輯  { background: #d1ecf1; color: #0c5460; }
+        .badge-刪除  { background: #fff3cd; color: #856404; }
+        .badge-永久刪除 { background: #f8d7da; color: #721c24; }
+
+        /* ── 空狀態 ── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state p { font-size: 15px; }
+
+        /* ── 載入指示 ── */
+        .loading { text-align: center; padding: 40px; color: #999; font-size: 15px; }
+
+        /* ── 筆數統計 ── */
+        .count-info {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="header-left">
+                <div class="logo">🏥</div>
+                <h1>Bcmedia 診所管理系統</h1>
+            </div>
+            <div class="header-right">
+                <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+            </div>
+        </div>
+        <div class="nav">
+            <a href="/" class="nav-btn">📋 診所管理</a>
+            <a href="/health-mall" class="nav-btn">🏪 健康醫購</a>
+            <a href="/campaign-match" class="nav-btn">🎯 活動比對</a>
+            <a href="/campaign-history" class="nav-btn">📅 活動記錄</a>
+            <a href="/baiwei" class="nav-btn">🏅 百位</a>
+            <a href="/analytics" class="nav-btn">📊 統計分析</a>
+            <a href="/audit-log" class="nav-btn active">📝 操作記錄</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>📝 操作記錄</h2>
+        </div>
+
+        <!-- 過濾列 -->
+        <div class="filter-bar">
+            <span class="filter-label">篩選動作：</span>
+            <select id="actionFilter" class="filter-select" onchange="loadLogs()">
+                <option value="">全部</option>
+                <option value="新增">新增</option>
+                <option value="編輯">編輯</option>
+                <option value="刪除">刪除</option>
+                <option value="永久刪除">永久刪除</option>
+            </select>
+            <button class="btn-refresh" onclick="loadLogs()">🔄 重新整理</button>
+        </div>
+
+        <div class="count-info" id="countInfo"></div>
+
+        <div class="table-card">
+            <div id="logsContainer" class="loading">載入中...</div>
+        </div>
+    </div>
+
+    <script>
+        // 載入並顯示操作記錄
+        async function loadLogs() {
+            const action = document.getElementById('actionFilter').value;
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = '<div class="loading">載入中...</div>';
+            document.getElementById('countInfo').textContent = '';
+
+            try {
+                const url = action ? `/api/audit-log?action=${encodeURIComponent(action)}` : '/api/audit-log';
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('載入失敗');
+                const logs = await res.json();
+                renderLogs(logs);
+            } catch (err) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>載入失敗，請稍後再試</p></div>';
+            }
+        }
+
+        // 渲染記錄列表
+        function renderLogs(logs) {
+            const container = document.getElementById('logsContainer');
+            const countInfo = document.getElementById('countInfo');
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>目前沒有操作記錄</p></div>';
+                countInfo.textContent = '';
+                return;
+            }
+
+            countInfo.textContent = `共 ${logs.length} 筆記錄（最多顯示 500 筆）`;
+
+            // 取得動作對應的 badge class
+            function getBadgeClass(action) {
+                const map = { '新增': 'badge-新增', '編輯': 'badge-編輯', '刪除': 'badge-刪除', '永久刪除': 'badge-永久刪除' };
+                return map[action] || '';
+            }
+
+            const rows = logs.map(l => `
+                <tr>
+                    <td>${escapeHtml(l.created_at)}</td>
+                    <td><span class="badge ${getBadgeClass(l.action)}">${escapeHtml(l.action)}</span></td>
+                    <td>${escapeHtml(l.target_name)}</td>
+                    <td style="color:#999; font-size:13px;">#${l.target_id || '-'}</td>
+                    <td style="color:#555;">${escapeHtml(l.detail)}</td>
+                </tr>
+            `).join('');
+
+            container.innerHTML = `
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th>時間</th>
+                            <th>動作</th>
+                            <th>診所名稱</th>
+                            <th>診所 ID</th>
+                            <th>備註</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        // 防 XSS：轉義 HTML 特殊字元
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // 頁面載入時自動讀取記錄
+        loadLogs();
+    </script>
+</body>
+</html>
