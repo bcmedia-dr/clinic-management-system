@@ -468,26 +468,37 @@
         </div>
     </div>
 
-    <!-- 匯入名單 Modal -->
+    <!-- 匯入名單 Modal（兩步驟：預覽→確認）-->
     <div class="modal" id="importModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>📤 匯入活動名單</h2>
                 <button class="close-btn" onclick="closeImportModal()">&times;</button>
             </div>
-            <div style="margin-bottom:16px;">
-                <p style="color:#666;font-size:13px;line-height:1.8;">
-                    📋 欄位格式：縣市、區域、診所名稱、科別、地址、<strong>電話</strong>（必填）、負責人<br>
-                    • 電話在總表有 → 記錄參加活動<br>
-                    • 電話在總表沒有 → 先新增到總表，再記錄參加活動
-                </p>
+            <!-- Step 1：選檔 -->
+            <div id="importStep1">
+                <div style="margin-bottom:16px;">
+                    <p style="color:#666;font-size:13px;line-height:1.8;">
+                        📋 欄位格式：縣市、區域、診所名稱、科別、地址、<strong>電話</strong>（必填）、負責人<br>
+                        • 電話在總表有 → 記錄參加活動<br>
+                        • 電話在總表沒有 → 先新增到總表，再記錄參加活動
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label>選擇 Excel 檔案（.xlsx）</label>
+                    <input type="file" id="importFile" accept=".xlsx"
+                        style="padding:10px;border:2px dashed #e0e0e0;border-radius:8px;">
+                </div>
+                <button class="btn-submit" id="btnPreviewImport" onclick="previewImport()">🔍 預覽</button>
             </div>
-            <div class="form-group">
-                <label>選擇 Excel 檔案（.xlsx）</label>
-                <input type="file" id="importFile" accept=".xlsx"
-                    style="padding:10px;border:2px dashed #e0e0e0;border-radius:8px;">
+            <!-- Step 2：預覽結果＋確認 -->
+            <div id="importStep2" style="display:none;">
+                <div id="importPreviewResult"></div>
+                <div style="display:flex;gap:12px;margin-top:16px;">
+                    <button class="btn-submit" onclick="confirmImport()" style="background:linear-gradient(135deg,#4ade80,#22c55e);flex:1;">✅ 確認匯入</button>
+                    <button class="btn-submit" onclick="cancelImport()" style="background:#999;flex:0 0 auto;padding:14px 24px;">取消</button>
+                </div>
             </div>
-            <button class="btn-submit" onclick="uploadImport()">開始匯入</button>
             <div class="import-result" id="importResult"></div>
         </div>
     </div>
@@ -888,13 +899,89 @@
         function showImportModal() {
             document.getElementById('importFile').value = '';
             document.getElementById('importResult').style.display = 'none';
-            document.getElementById('importModal').style.display  = 'block';
+            document.getElementById('importStep1').style.display = 'block';
+            document.getElementById('importStep2').style.display = 'none';
+            document.getElementById('importModal').style.display = 'block';
         }
-        function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
+        function closeImportModal() {
+            document.getElementById('importModal').style.display = 'none';
+            document.getElementById('importStep1').style.display = 'block';
+            document.getElementById('importStep2').style.display = 'none';
+            document.getElementById('importResult').style.display = 'none';
+        }
 
-        async function uploadImport() {
+        // 預覽輔助函式（與 index.html 相同邏輯）
+        function buildPreviewHtml(result) {
+            const skipLabel = result.would_skip > 0 ? `　⏭️ 略過 ${result.would_skip} 筆` : '';
+            let html = `<div style="background:#e8f4fd;border:1px solid #bee3f8;border-radius:8px;padding:15px;margin-bottom:12px;">
+                <strong>📊 匯入預覽</strong><br>
+                🆕 新增 ${result.would_create} 筆　✏️ 更新 ${result.would_update} 筆${skipLabel}
+            </div>`;
+            const errList = Array.isArray(result.errors) ? result.errors : (result.error_details || []);
+            const errCount = typeof result.errors === 'number' ? result.errors : errList.length;
+            if (errCount > 0) {
+                html += `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:12px;">
+                    <strong>⚠️ 錯誤 ${errCount} 筆</strong><br>
+                    ${errList.slice(0, 5).join('<br>')}
+                    ${errList.length > 5 ? `<br>...等 ${errList.length - 5} 筆` : ''}
+                </div>`;
+            }
+            if (result.preview && result.preview.length > 0) {
+                const actionLabel = { create: '新增', update: '更新', skip: '略過' };
+                const actionColor = { create: '#155724', update: '#004085', skip: '#856404' };
+                const actionBg    = { create: '#d4edda', update: '#cce5ff', skip: '#fff3cd' };
+                html += `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead><tr style="background:#f5f7fa;">
+                        <th style="padding:7px 10px;text-align:left;font-weight:600;">診所名稱</th>
+                        <th style="padding:7px 10px;text-align:left;font-weight:600;">電話</th>
+                        <th style="padding:7px 10px;text-align:left;font-weight:600;">縣市</th>
+                        <th style="padding:7px 10px;text-align:left;font-weight:600;">動作</th>
+                    </tr></thead>
+                    <tbody>
+                    ${result.preview.map(p => `<tr style="border-top:1px solid #f0f0f0;">
+                        <td style="padding:7px 10px;">${p.name || '-'}</td>
+                        <td style="padding:7px 10px;">${p.phone || '-'}</td>
+                        <td style="padding:7px 10px;">${p.region || '-'}</td>
+                        <td style="padding:7px 10px;"><span style="background:${actionBg[p.action]||'#eee'};color:${actionColor[p.action]||'#333'};padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;">${actionLabel[p.action] || p.action}</span></td>
+                    </tr>`).join('')}
+                    </tbody>
+                </table>
+                ${result.preview.length >= 10 ? '<p style="color:#999;font-size:12px;margin-top:6px;">（僅顯示前 10 筆）</p>' : ''}`;
+            }
+            return html;
+        }
+
+        async function previewImport() {
             const file = document.getElementById('importFile').files[0];
             if (!file) { alert('請選擇檔案'); return; }
+            const btn = document.getElementById('btnPreviewImport');
+            btn.disabled = true; btn.textContent = '分析中...';
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch(`/api/campaigns/${currentCampaignId}/import?dry_run=true`,
+                    { method: 'POST', body: formData });
+                const result = await res.json();
+                if (result.error) { alert(result.error); return; }
+                document.getElementById('importPreviewResult').innerHTML = buildPreviewHtml(result);
+                document.getElementById('importStep1').style.display = 'none';
+                document.getElementById('importStep2').style.display = 'block';
+            } catch(e) {
+                alert('預覽失敗：' + e.message);
+            } finally {
+                btn.disabled = false; btn.textContent = '🔍 預覽';
+            }
+        }
+
+        function cancelImport() {
+            document.getElementById('importStep1').style.display = 'block';
+            document.getElementById('importStep2').style.display = 'none';
+            document.getElementById('importFile').value = '';
+        }
+
+        async function confirmImport() {
+            const file = document.getElementById('importFile').files[0];
+            if (!file) { alert('請重新選擇檔案'); cancelImport(); return; }
             const formData = new FormData();
             formData.append('file', file);
             try {
@@ -902,6 +989,7 @@
                     { method: 'POST', body: formData });
                 const result = await res.json();
                 const div    = document.getElementById('importResult');
+                document.getElementById('importStep2').style.display = 'none';
                 div.style.display = 'block';
                 if (result.success) {
                     let errHtml = result.errors.length > 0

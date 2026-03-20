@@ -9,8 +9,9 @@ def _normalize_phone(phone):
     return re.sub(r'\D', '', str(phone)) if phone else ''
 
 
-def import_clinics(file_path, db, Clinic):
-    """從 Excel 匯入診所資料，以電話號碼檢查重複"""
+def import_clinics(file_path, db, Clinic, dry_run=False):
+    """從 Excel 匯入診所資料，以電話號碼檢查重複。
+    dry_run=True 時執行所有判斷但不寫入資料庫，回傳預覽結果。"""
     try:
         wb = load_workbook(file_path)
         ws = wb.active
@@ -30,6 +31,7 @@ def import_clinics(file_path, db, Clinic):
         imported_count = 0
         updated_count  = 0
         errors = []
+        preview = []  # 預覽清單（最多 10 筆）
 
         consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -68,6 +70,8 @@ def import_clinics(file_path, db, Clinic):
                     existing.address        = address
                     existing.contact_person = contact_person
                     updated_count += 1
+                    if len(preview) < 10:
+                        preview.append({'name': str(name), 'phone': phone_fmt, 'action': 'update', 'region': region_str or ''})
                     continue
 
                 clinic = Clinic(
@@ -88,6 +92,8 @@ def import_clinics(file_path, db, Clinic):
                     if normalized:
                         phone_to_existing[normalized] = clinic
                     imported_count += 1
+                    if len(preview) < 10:
+                        preview.append({'name': str(name), 'phone': phone_fmt, 'action': 'create', 'region': region_str or ''})
                 except IntegrityError:
                     # 並發情況：INSERT 失敗但 phone_to_existing 未命中，改為更新
                     sp.rollback()
@@ -101,11 +107,25 @@ def import_clinics(file_path, db, Clinic):
                         existing.contact_person = contact_person
                         phone_to_existing[normalized] = existing
                         updated_count += 1
+                        if len(preview) < 10:
+                            preview.append({'name': str(name), 'phone': phone_fmt, 'action': 'update', 'region': region_str or ''})
                     else:
                         errors.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
 
             except Exception as e:
                 errors.append(f'第{row_num}列：{str(e)}')
+
+        # dry_run 模式：rollback 確保不寫入，回傳預覽結果
+        if dry_run:
+            db.session.rollback()
+            return {
+                'dry_run':      True,
+                'would_create': imported_count,
+                'would_update': updated_count,
+                'would_skip':   0,
+                'errors':       errors,
+                'preview':      preview,
+            }
 
         db.session.commit()
 
@@ -121,8 +141,9 @@ def import_clinics(file_path, db, Clinic):
         return {'success': False, 'error': str(e)}
 
 
-def import_health_mall(file_path, db, HealthMall):
-    """從 Excel 匯入健康醫購資料，以電話號碼檢查重複"""
+def import_health_mall(file_path, db, HealthMall, dry_run=False):
+    """從 Excel 匯入健康醫購資料，以電話號碼檢查重複。
+    dry_run=True 時執行所有判斷但不寫入資料庫，回傳預覽結果。"""
     try:
         wb = load_workbook(file_path)
         ws = wb.active
@@ -147,6 +168,7 @@ def import_health_mall(file_path, db, HealthMall):
         skipped_count  = 0
         skipped_names  = []
         errors         = []
+        preview        = []  # 預覽清單（最多 10 筆）
 
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             try:
@@ -171,6 +193,8 @@ def import_health_mall(file_path, db, HealthMall):
                 if normalized and normalized in existing_phones:
                     skipped_count += 1
                     skipped_names.append(name)
+                    if len(preview) < 10:
+                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'skip', 'region': _get('縣市')})
                     continue
 
                 start_date = None
@@ -199,9 +223,23 @@ def import_health_mall(file_path, db, HealthMall):
                 if normalized:
                     existing_phones.add(normalized)
                 imported_count += 1
+                if len(preview) < 10:
+                    preview.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': _get('縣市')})
 
             except Exception as e:
                 errors.append(f'第{row_num}列：{str(e)}')
+
+        # dry_run 模式：rollback 確保不寫入，回傳預覽結果
+        if dry_run:
+            db.session.rollback()
+            return {
+                'dry_run':      True,
+                'would_create': imported_count,
+                'would_update': 0,
+                'would_skip':   skipped_count,
+                'errors':       errors,
+                'preview':      preview,
+            }
 
         db.session.commit()
 

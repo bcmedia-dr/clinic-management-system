@@ -41,11 +41,12 @@ def _parse_name(raw_name):
     return name.strip(), note
 
 
-def import_custom_clinics(file_path, db, Clinic):
+def import_custom_clinics(file_path, db, Clinic, dry_run=False):
     """
     匯入自訂格式 Excel（欄位名稱：縣市、區域、院名、科別、院址、電話、聯絡人、院長）。
     院名自動清理括號/斜線內容為備註。
-    以電話號碼檢查重複，重複者跳過。
+    以電話號碼檢查重複，重複者更新。
+    dry_run=True 時執行所有判斷但不寫入資料庫，回傳預覽結果。
     """
     try:
         wb = load_workbook(file_path)
@@ -74,6 +75,7 @@ def import_custom_clinics(file_path, db, Clinic):
         updated_count  = 0
         error_count    = 0
         error_details  = []
+        preview        = []  # 預覽清單（最多 10 筆）
 
         consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -100,6 +102,7 @@ def import_custom_clinics(file_path, db, Clinic):
                 phone_raw  = _get(row, '電話')
                 phone_fmt  = format_phone(phone_raw, _get(row, '縣市') or None)   # 先補區碼
                 normalized = _normalize_phone(phone_fmt)                            # 再正規化（含區碼的完整數字）
+                region_val = _get(row, '縣市') or ''
 
                 if normalized and normalized in phone_to_existing:
                     # 電話已存在 → 更新現有診所資料（phone / phone_normalized 不動）
@@ -114,6 +117,8 @@ def import_custom_clinics(file_path, db, Clinic):
                     if extracted_note:
                         existing.note = extracted_note
                     updated_count += 1
+                    if len(preview) < 10:
+                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': region_val})
                     continue
 
                 clinic = Clinic(
@@ -135,6 +140,8 @@ def import_custom_clinics(file_path, db, Clinic):
                     if normalized:
                         phone_to_existing[normalized] = clinic
                     imported_count += 1
+                    if len(preview) < 10:
+                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': region_val})
                 except IntegrityError:
                     # 並發情況：INSERT 失敗但 phone_to_existing 未命中，改為更新
                     sp.rollback()
@@ -150,6 +157,8 @@ def import_custom_clinics(file_path, db, Clinic):
                             existing.note = extracted_note
                         phone_to_existing[normalized] = existing
                         updated_count += 1
+                        if len(preview) < 10:
+                            preview.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': region_val})
                     else:
                         error_count += 1
                         error_details.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
@@ -157,6 +166,19 @@ def import_custom_clinics(file_path, db, Clinic):
             except Exception as e:
                 error_count += 1
                 error_details.append(f'第{row_num}列：{str(e)}')
+
+        # dry_run 模式：rollback 確保不寫入，回傳預覽結果
+        if dry_run:
+            db.session.rollback()
+            return {
+                'dry_run':      True,
+                'would_create': imported_count,
+                'would_update': updated_count,
+                'would_skip':   0,
+                'errors':       error_count,
+                'error_details': error_details,
+                'preview':      preview,
+            }
 
         db.session.commit()
 

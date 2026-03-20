@@ -697,8 +697,9 @@ def import_data():
     filename = secure_filename(file.filename)
     temp_path = os.path.join('/tmp', filename)
     file.save(temp_path)
+    dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
     with app.app_context():
-        result = import_clinics(temp_path, db, Clinic)
+        result = import_clinics(temp_path, db, Clinic, dry_run=dry_run)
     os.remove(temp_path)
     return jsonify(result)
 
@@ -717,8 +718,9 @@ def import_custom_data():
     filename = secure_filename(file.filename)
     temp_path = os.path.join('/tmp', filename)
     file.save(temp_path)
+    dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
     with app.app_context():
-        result = import_custom_clinics(temp_path, db, Clinic)
+        result = import_custom_clinics(temp_path, db, Clinic, dry_run=dry_run)
     os.remove(temp_path)
     return jsonify(result)
 
@@ -737,8 +739,9 @@ def import_health_mall_data():
     filename = secure_filename(file.filename)
     temp_path = os.path.join('/tmp', filename)
     file.save(temp_path)
+    dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
     with app.app_context():
-        result = import_health_mall(temp_path, db, HealthMall)
+        result = import_health_mall(temp_path, db, HealthMall, dry_run=dry_run)
     os.remove(temp_path)
     return jsonify(result)
 
@@ -1079,9 +1082,11 @@ def import_campaign_clinics(campaign_id):
         in_campaign = {cc.clinic_id for cc in
                        CampaignClinic.query.filter_by(campaign_id=campaign_id).all()}
 
+        dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
         new_clinics_count = updated_count = recorded = already_in_campaign = 0
         errors = []
         processed_clinics = []  # 記錄本次處理過的診所，匯入後連動合作項目
+        preview = []  # 預覽清單（最多 10 筆）
 
         data_start_row = header_row_idx + 1
         consecutive_blank = 0  # 連續空白行計數器
@@ -1118,6 +1123,9 @@ def import_campaign_clinics(campaign_id):
                 if new_addr:    clinic.address        = new_addr
                 if new_contact: clinic.contact_person = new_contact
                 updated_count += 1
+                clinic_name_for_preview = _resolve(row, '診所名稱', '院名')
+                if len(preview) < 10:
+                    preview.append({'name': clinic_name_for_preview, 'phone': phone_fmt, 'action': 'update', 'region': _resolve(row, '縣市')})
             else:
                 raw_name = _resolve(row, '診所名稱', '院名')
                 if not raw_name:
@@ -1147,6 +1155,8 @@ def import_campaign_clinics(campaign_id):
                     db.session.flush()
                     phone_to_clinic[normalized] = clinic
                     new_clinics_count += 1
+                    if len(preview) < 10:
+                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': _resolve(row, '縣市')})
                 except IntegrityError:
                     # 並發情況：INSERT 失敗但 phone_to_clinic 未命中，改為更新
                     sp.rollback()
@@ -1156,6 +1166,8 @@ def import_campaign_clinics(campaign_id):
                         continue
                     phone_to_clinic[normalized] = clinic
                     updated_count += 1
+                    if len(preview) < 10:
+                        preview.append({'name': name, 'phone': phone_fmt, 'action': 'update', 'region': _resolve(row, '縣市')})
 
             processed_clinics.append(clinic)
 
@@ -1175,9 +1187,23 @@ def import_campaign_clinics(campaign_id):
             if clinic.id in in_campaign:
                 already_in_campaign += 1
                 continue
-            db.session.add(CampaignClinic(campaign_id=campaign_id, clinic_id=clinic.id))
+            # dry_run 模式下不加入 CampaignClinic，僅計數
+            if not dry_run:
+                db.session.add(CampaignClinic(campaign_id=campaign_id, clinic_id=clinic.id))
             in_campaign.add(clinic.id)
             recorded += 1
+
+        # dry_run 模式：rollback 確保不寫入，回傳預覽結果
+        if dry_run:
+            db.session.rollback()
+            return jsonify({
+                'dry_run':             True,
+                'would_create':        new_clinics_count,
+                'would_update':        updated_count,
+                'would_skip':          already_in_campaign,
+                'errors':              errors,
+                'preview':             preview,
+            })
 
         db.session.commit()
         return jsonify({
@@ -1360,8 +1386,10 @@ def import_baiwei():
             for d in BaiweiDoctor.query.all()
         }
 
+        dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
         new_count = already_count = 0
         errors = []
+        preview = []  # 預覽清單（最多 10 筆）
 
         consecutive_blank = 0  # 連續空白行計數器
         for row_num, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True), start=header_row_idx + 1):
@@ -1387,6 +1415,8 @@ def import_baiwei():
             # 重複檢查
             if (normalized, doctor_name) in existing_keys:
                 already_count += 1
+                if len(preview) < 10:
+                    preview.append({'name': _get(row, '診所名稱', '院名'), 'phone': phone_fmt_bw, 'action': 'skip', 'region': _get(row, '縣市')})
                 continue
 
             # 比對或新增診所
@@ -1441,6 +1471,20 @@ def import_baiwei():
             db.session.add(doc)
             existing_keys.add((normalized, doctor_name))
             new_count += 1
+            if len(preview) < 10:
+                preview.append({'name': _get(row, '診所名稱', '院名') or (clinic.name if clinic else ''), 'phone': phone_fmt_bw, 'action': 'create', 'region': _get(row, '縣市')})
+
+        # dry_run 模式：rollback 確保不寫入，回傳預覽結果
+        if dry_run:
+            db.session.rollback()
+            return jsonify({
+                'dry_run':      True,
+                'would_create': new_count,
+                'would_update': 0,
+                'would_skip':   already_count,
+                'errors':       errors,
+                'preview':      preview,
+            })
 
         db.session.commit()
         return jsonify({'success': True, 'new': new_count, 'already_exists': already_count, 'errors': errors})
