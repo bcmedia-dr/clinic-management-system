@@ -276,6 +276,9 @@ def update_clinic(clinic_id):
         clinic.note           = data.get('note')
         db.session.commit()
         return jsonify({'success': True})
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': '此電話號碼已有其他診所使用，請確認是否為重複診所'}), 409
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'更新失敗: {str(e)}'}), 500
