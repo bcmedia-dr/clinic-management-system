@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 from export import export_clinics
 from import_data import import_clinics, import_health_mall
 from import_custom import import_custom_clinics
-from phone_utils import format_phone, normalize_specialty
+from phone_utils import format_phone, normalize_specialty, STANDARD_SPECIALTIES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback-only-for-local')
@@ -448,58 +448,91 @@ def get_audit_log():
 def get_clinic_duplicates():
     """
     找出可能重複的診所：
-    1. 診所名稱完全相同
-    2. 去除「診所/醫院/醫學中心/聯合/附設」後名稱相同（相似）
+    1. 診所名稱完全相同（SQL GROUP BY name）
+    2. 電話號碼相同（SQL GROUP BY phone_normalized）
+    3. 去除「診所/醫院/醫學中心/聯合/附設」後名稱相同（相似，Python）
     """
     from collections import defaultdict
     import re as _re
+    from sqlalchemy import func
 
-    all_clinics = Clinic.query.filter(Clinic.status != 'deleted').order_by(Clinic.id).all()
+    def _brief(c):
+        return {'id': c.id, 'name': c.name or '', 'phone': c.phone or '',
+                'region': c.region or '', 'district': c.district or ''}
 
-    # ── 1. 完全相同 ──────────────────────────────────────
-    name_groups = defaultdict(list)
-    for c in all_clinics:
-        if c.name:
-            name_groups[c.name.strip()].append(c)
-
+    # ── 1. 名稱完全相同 → SQL GROUP BY name ──────────────
+    dup_name_rows = (
+        db.session.query(Clinic.name, func.count(Clinic.id).label('cnt'))
+        .filter(Clinic.status != 'deleted', Clinic.name != None)
+        .group_by(Clinic.name)
+        .having(func.count(Clinic.id) > 1)
+        .all()
+    )
     exact = []
-    for name, clinics in name_groups.items():
-        if len(clinics) > 1:
-            exact.append({
-                'name':   name,
-                'count':  len(clinics),
-                'clinics': [{'id': c.id, 'name': c.name, 'phone': c.phone or '',
-                              'region': c.region or '', 'district': c.district or ''} for c in clinics],
-            })
+    exact_name_set = set()
+    for name, cnt in dup_name_rows:
+        clinics = Clinic.query.filter(
+            Clinic.status != 'deleted', Clinic.name == name
+        ).order_by(Clinic.id).all()
+        exact.append({'name': name, 'count': cnt, 'clinics': [_brief(c) for c in clinics]})
+        exact_name_set.add(name)
 
-    # ── 2. 名稱相似（去除常見後綴詞後相同）────────────────
+    # ── 2. 電話重複 → SQL GROUP BY phone_normalized ──────
+    dup_phone_rows = (
+        db.session.query(Clinic.phone_normalized, func.count(Clinic.id).label('cnt'))
+        .filter(Clinic.status != 'deleted',
+                Clinic.phone_normalized != None,
+                Clinic.phone_normalized != '')
+        .group_by(Clinic.phone_normalized)
+        .having(func.count(Clinic.id) > 1)
+        .all()
+    )
+    for phone_norm, cnt in dup_phone_rows:
+        clinics = Clinic.query.filter(
+            Clinic.status != 'deleted', Clinic.phone_normalized == phone_norm
+        ).order_by(Clinic.id).all()
+        # 若所有重複診所名稱相同，已在 exact 組，跳過
+        names = {c.name for c in clinics}
+        if len(names) == 1 and list(names)[0] in exact_name_set:
+            continue
+        exact.append({
+            'name':    f'電話重複：{clinics[0].phone or phone_norm}',
+            'count':   cnt,
+            'clinics': [_brief(c) for c in clinics],
+        })
+
+    # ── 3. 名稱相似（去除常見後綴詞後相同）→ Python ──────
     def simplify(name):
         s = _re.sub(r'診所|醫院|醫學中心|聯合|附設|小兒科|家醫科|耳鼻喉科|內科|外科|皮膚科|婦產科|中醫', '', name or '')
         return s.strip()
 
+    all_clinics = Clinic.query.filter(Clinic.status != 'deleted').order_by(Clinic.id).all()
     simplified_groups = defaultdict(list)
     for c in all_clinics:
         if c.name:
             s = simplify(c.name)
-            if s:  # 去除後不為空才歸類
+            if s:
                 simplified_groups[s].append(c)
 
     similar = []
-    exact_names = {g['name'] for g in exact}  # 完全相同的組別不再重複顯示
     for simplified, clinics in simplified_groups.items():
         if len(clinics) > 1:
             names = {c.name for c in clinics}
-            # 跳過：所有名稱完全相同（已在 exact 組），或只有一種名稱但本來就在 exact
-            if len(names) == 1 and list(names)[0] in exact_names:
+            if len(names) == 1 and list(names)[0] in exact_name_set:
                 continue
             similar.append({
                 'simplified': simplified,
                 'count':      len(clinics),
-                'clinics':    [{'id': c.id, 'name': c.name, 'phone': c.phone or '',
-                                'region': c.region or '', 'district': c.district or ''} for c in clinics],
+                'clinics':    [_brief(c) for c in clinics],
             })
 
     return jsonify({'exact': exact, 'similar': similar})
+
+
+@app.route('/api/specialties')
+def get_specialties():
+    """回傳系統標準科別白名單，供各頁面科別下拉選單使用"""
+    return jsonify(STANDARD_SPECIALTIES)
 
 
 @app.route('/api/clinics/search')
@@ -532,14 +565,13 @@ def search_clinics_for_hm():
     )
 
     if is_phone_query:
-        # 電話搜尋：雙邊都 normalize 後做子字串比對，解決新舊格式不一致問題
-        # （格式化後 DB 存 "02-2876-6955"，使用者可能搜 "0228766955"，需對齊）
-        all_clinics = Clinic.query.filter(Clinic.status != 'deleted').order_by(Clinic.name).all()
-        clinics = [
-            c for c in all_clinics
-            if (q in (c.name or '')) or
-               (c.phone and q_digits in _normalize_phone(c.phone))
-        ][:30]
+        # 電話搜尋：以 phone_normalized（純數字）做子字串比對，解決格式不一致問題
+        # （DB 存 "02-2876-6955"，使用者搜 "0228766955" → 都轉純數字後比對）
+        clinics = Clinic.query.filter(
+            Clinic.status != 'deleted'
+        ).filter(
+            Clinic.name.contains(q) | Clinic.phone_normalized.contains(q_digits)
+        ).order_by(Clinic.name).limit(30).all()
     else:
         clinics = Clinic.query.filter(
             Clinic.status != 'deleted'

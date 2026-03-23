@@ -198,21 +198,6 @@
         <div class="controls-row">
             <select class="filter-select" id="filterSpecialty" onchange="applyFilter()">
                 <option value="">全部科別</option>
-                <option value="小兒科">小兒科</option>
-                <option value="家醫科">家醫科</option>
-                <option value="耳鼻喉科">耳鼻喉科</option>
-                <option value="內科">內科</option>
-                <option value="外科">外科</option>
-                <option value="皮膚科">皮膚科</option>
-                <option value="婦產科">婦產科</option>
-                <option value="復健/骨科">復健/骨科</option>
-                <option value="中醫">中醫</option>
-                <option value="內兒科">內兒科</option>
-                <option value="神經科">神經科</option>
-                <option value="精神科">精神科</option>
-                <option value="身心科">身心科</option>
-                <option value="眼科">眼科</option>
-                <option value="其他">其他</option>
             </select>
             <span class="total-count" id="totalCount"></span>
             <div class="spacer"></div>
@@ -278,9 +263,9 @@
 <script>
 let allData = [];
 
-// 動態載入科別選單（從資料庫拆分、去重後的結果）
+// 動態載入科別選單（從 /api/specialties 取得標準科別白名單）
 async function loadSpecialties() {
-    const res = await fetch('/api/baiwei/specialties');
+    const res = await fetch('/api/specialties');
     const specialties = await res.json();
     const sel = document.getElementById('filterSpecialty');
     specialties.forEach(s => {
@@ -477,7 +462,8 @@ document.getElementById('importModal').addEventListener('click', function(e) {
     if (e.target === this) closeImportModal();
 });
 
-// 載入資料（科別選單已改為靜態固定清單，不需動態載入）
+// 載入科別選單後再載入資料
+loadSpecialties();
 loadData();
 </script>
 </body>
