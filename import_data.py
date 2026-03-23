@@ -9,6 +9,17 @@ def _normalize_phone(phone):
     return re.sub(r'\D', '', str(phone)) if phone else ''
 
 
+def _row_error_msg(e):
+    """將例外轉換為使用者可理解的中文錯誤訊息。"""
+    if isinstance(e, KeyError):
+        return f'缺少欄位 {e}，請確認欄位名稱是否正確'
+    if isinstance(e, ValueError):
+        return '數值格式錯誤，請確認資料格式後重新上傳'
+    if isinstance(e, (TypeError, AttributeError)):
+        return '資料格式錯誤，請確認後重新上傳'
+    return '資料格式錯誤，請確認後重新上傳'
+
+
 def import_clinics(file_path, db, Clinic, dry_run=False):
     """從 Excel 匯入診所資料，以電話號碼檢查重複。
     dry_run=True 時執行所有判斷但不寫入資料庫，回傳預覽結果。"""
@@ -114,7 +125,7 @@ def import_clinics(file_path, db, Clinic, dry_run=False):
                         errors.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
 
             except Exception as e:
-                errors.append(f'第{row_num}列：{str(e)}')
+                errors.append(f'第{row_num}列：{_row_error_msg(e)}')
 
         # dry_run 模式：rollback 確保不寫入，回傳預覽結果
         if dry_run:
@@ -139,7 +150,7 @@ def import_clinics(file_path, db, Clinic, dry_run=False):
 
     except Exception as e:
         db.session.rollback()
-        return {'success': False, 'error': str(e)}
+        return {'success': False, 'error': '匯入失敗：無法讀取檔案，請確認檔案格式是否為有效的 .xlsx'}
 
 
 def import_health_mall(file_path, db, HealthMall, dry_run=False):
@@ -169,6 +180,7 @@ def import_health_mall(file_path, db, HealthMall, dry_run=False):
         skipped_count  = 0
         skipped_names  = []
         errors         = []
+        warnings       = []  # 非致命性警告（如日期格式錯誤）
         preview        = []  # 預覽清單（最多 10 筆）
 
         for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -204,7 +216,7 @@ def import_health_mall(file_path, db, HealthMall, dry_run=False):
                     try:
                         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
                     except ValueError:
-                        pass
+                        warnings.append(f'第{row_num}列：開始日期「{start_date_str}」格式錯誤（需為 YYYY-MM-DD），已略過該欄位')
 
                 status = _get('合作狀態') or '合作中'
 
@@ -228,7 +240,7 @@ def import_health_mall(file_path, db, HealthMall, dry_run=False):
                     preview.append({'name': name, 'phone': phone_fmt, 'action': 'create', 'region': _get('縣市')})
 
             except Exception as e:
-                errors.append(f'第{row_num}列：{str(e)}')
+                errors.append(f'第{row_num}列：{_row_error_msg(e)}')
 
         # dry_run 模式：rollback 確保不寫入，回傳預覽結果
         if dry_run:
@@ -239,6 +251,7 @@ def import_health_mall(file_path, db, HealthMall, dry_run=False):
                 'would_update': 0,
                 'would_skip':   skipped_count,
                 'errors':       errors,
+                'warnings':     warnings,
                 'preview':      preview,
             }
 
@@ -250,8 +263,9 @@ def import_health_mall(file_path, db, HealthMall, dry_run=False):
             'skipped':       skipped_count,
             'skipped_names': skipped_names,
             'errors':        errors,
+            'warnings':      warnings,
         }
 
     except Exception as e:
         db.session.rollback()
-        return {'success': False, 'error': str(e)}
+        return {'success': False, 'error': '匯入失敗：無法讀取檔案，請確認檔案格式是否為有效的 .xlsx'}

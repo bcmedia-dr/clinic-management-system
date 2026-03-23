@@ -429,15 +429,20 @@ def get_audit_log():
     query = AuditLog.query
     if action_filter:
         query = query.filter(AuditLog.action == action_filter)
+    total_count = query.count()
     logs = query.order_by(AuditLog.created_at.desc()).limit(500).all()
-    return jsonify([{
-        'id':          l.id,
-        'action':      l.action      or '',
-        'target_name': l.target_name or '',
-        'target_id':   l.target_id,
-        'detail':      l.detail      or '',
-        'created_at':  l.created_at.strftime('%Y-%m-%d %H:%M:%S') if l.created_at else '',
-    } for l in logs])
+    return jsonify({
+        'total': total_count,
+        'shown': len(logs),
+        'logs': [{
+            'id':          l.id,
+            'action':      l.action      or '',
+            'target_name': l.target_name or '',
+            'target_id':   l.target_id,
+            'detail':      l.detail      or '',
+            'created_at':  l.created_at.strftime('%Y-%m-%d %H:%M:%S') if l.created_at else '',
+        } for l in logs],
+    })
 
 @app.route('/api/clinics/duplicates')
 def get_clinic_duplicates():

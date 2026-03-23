@@ -206,15 +206,15 @@
                 const url = action ? `/api/audit-log?action=${encodeURIComponent(action)}` : '/api/audit-log';
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('載入失敗');
-                const logs = await res.json();
-                renderLogs(logs);
+                const data = await res.json();
+                renderLogs(data.logs, data.total, data.shown);
             } catch (err) {
                 container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>載入失敗，請稍後再試</p></div>';
             }
         }
 
         // 渲染記錄列表
-        function renderLogs(logs) {
+        function renderLogs(logs, total, shown) {
             const container = document.getElementById('logsContainer');
             const countInfo = document.getElementById('countInfo');
 
@@ -224,7 +224,11 @@
                 return;
             }
 
-            countInfo.textContent = `共 ${logs.length} 筆記錄（最多顯示 500 筆）`;
+            if (total > shown) {
+                countInfo.textContent = `目前顯示最新 ${shown} 筆，共 ${total} 筆紀錄`;
+            } else {
+                countInfo.textContent = `共 ${total} 筆紀錄`;
+            }
 
             // 取得動作對應的 badge class
             function getBadgeClass(action) {
