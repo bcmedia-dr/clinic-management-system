@@ -958,8 +958,7 @@ def campaign_match():
 
         not_joined = []
         for c in clinics:
-            np = _normalize_phone(c.phone)
-            if not np or np not in uploaded_phones:
+            if not c.phone_normalized or c.phone_normalized not in uploaded_phones:
                 not_joined.append(_clinic_brief(c))
 
         not_in_system = []
@@ -997,7 +996,7 @@ def export_not_joined():
     except ValueError:
         return jsonify({'error': '無效的 ID 格式'}), 400
 
-    clinics = Clinic.query.filter(Clinic.id.in_(ids)).all()
+    clinics = Clinic.query.filter(Clinic.id.in_(ids), Clinic.status != 'deleted').all()
     if not clinics:
         return jsonify({'error': '沒有符合條件的資料'}), 400
 
@@ -1153,7 +1152,9 @@ def update_campaign_clinic(campaign_id, clinic_id):
     if 'district'       in data: clinic.district       = data['district']
     if 'name'           in data: clinic.name           = data['name']
     if 'specialties'    in data: clinic.specialties    = data['specialties']
-    if 'phone'          in data: clinic.phone          = data['phone']
+    if 'phone'          in data:
+        clinic.phone            = data['phone']
+        clinic.phone_normalized = _normalize_phone(data['phone']) or None  # 同步更新正規化電話
     if 'contact_person' in data: clinic.contact_person = data['contact_person']
     db.session.commit()
     return jsonify({'success': True})
