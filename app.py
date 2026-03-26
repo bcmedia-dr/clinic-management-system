@@ -1370,7 +1370,10 @@ def import_campaign_clinics(campaign_id):
 
         # dry_run 模式：rollback 確保不寫入，回傳預覽結果
         if dry_run:
-            db.session.rollback()
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
             return jsonify({
                 'dry_run':             True,
                 'would_create':        new_clinics_count,
@@ -1396,7 +1399,10 @@ def import_campaign_clinics(campaign_id):
     except Exception as e:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        db.session.rollback()
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': f'匯入失敗: {str(e)}'}), 500
 
 @app.route('/api/campaigns/<int:campaign_id>/clinics/all', methods=['DELETE'])
