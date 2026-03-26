@@ -1209,9 +1209,9 @@ def import_campaign_clinics(campaign_id):
 
     filename  = secure_filename(file.filename)
     temp_path = os.path.join('/tmp', filename)
-    file.save(temp_path)
 
     try:
+        file.save(temp_path)
         wb = load_workbook(temp_path)
         ws = wb.active
         os.remove(temp_path)
@@ -1397,7 +1397,7 @@ def import_campaign_clinics(campaign_id):
         if os.path.exists(temp_path):
             os.remove(temp_path)
         db.session.rollback()
-        return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'匯入失敗: {str(e)}'}), 500
 
 @app.route('/api/campaigns/<int:campaign_id>/clinics/all', methods=['DELETE'])
 def clear_campaign_clinics(campaign_id):
