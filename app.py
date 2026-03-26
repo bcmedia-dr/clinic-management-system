@@ -1198,13 +1198,17 @@ def update_campaign_clinic(campaign_id, clinic_id):
 
 @app.route('/api/campaigns/<int:campaign_id>/import', methods=['POST'])
 def import_campaign_clinics(campaign_id):
+    print(f"[DEBUG] campaign_import called, campaign_id={campaign_id}, dry_run={request.args.get('dry_run')}, files={list(request.files.keys())}", flush=True)
     if session.get('role') != 'admin':
+        print(f"[DEBUG] returning 403 権限不足", flush=True)
         return jsonify({'error': '權限不足'}), 403
     campaign = Campaign.query.get_or_404(campaign_id)
     if 'file' not in request.files:
+        print(f"[DEBUG] returning 400 沒有上傳檔案", flush=True)
         return jsonify({'error': '沒有上傳檔案'}), 400
     file = request.files['file']
     if not file.filename.endswith('.xlsx'):
+        print(f"[DEBUG] returning 400 非xlsx, filename={file.filename}", flush=True)
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
     filename  = secure_filename(file.filename)
@@ -1212,7 +1216,9 @@ def import_campaign_clinics(campaign_id):
 
     try:
         file.save(temp_path)
+        print(f"[DEBUG] file saved to {temp_path}", flush=True)
         wb = load_workbook(temp_path)
+        print(f"[DEBUG] workbook loaded", flush=True)
         ws = wb.active
         os.remove(temp_path)
 
@@ -1232,6 +1238,7 @@ def import_campaign_clinics(campaign_id):
                 break
 
         if header_row_idx is None:
+            print(f"[DEBUG] returning 400 找不到標題行, preview={preview_rows}", flush=True)
             return jsonify({
                 'error': '找不到含「電話」的標題行（掃描前 5 行）',
                 'debug_preview': preview_rows,
@@ -1370,10 +1377,12 @@ def import_campaign_clinics(campaign_id):
 
         # dry_run 模式：rollback 確保不寫入，回傳預覽結果
         if dry_run:
+            print(f"[DEBUG] dry_run returning: would_create={new_clinics_count}, would_update={updated_count}, would_skip={already_in_campaign}, errors={len(errors)}, preview={len(preview_create+preview_update)}", flush=True)
             try:
                 db.session.rollback()
             except Exception:
                 pass
+            print(f"[DEBUG] dry_run rollback done, sending jsonify response", flush=True)
             return jsonify({
                 'dry_run':             True,
                 'would_create':        new_clinics_count,
@@ -1383,6 +1392,7 @@ def import_campaign_clinics(campaign_id):
                 'preview':             preview_create + preview_update,
             })
 
+        print(f"[DEBUG] commit returning: new={new_clinics_count}, updated={updated_count}, recorded={recorded}, skip={already_in_campaign}, errors={len(errors)}", flush=True)
         db.session.commit()
         return jsonify({
             'success':             True,
@@ -1397,6 +1407,9 @@ def import_campaign_clinics(campaign_id):
         })
 
     except Exception as e:
+        import traceback
+        print(f"[DEBUG] exception caught: {type(e).__name__}: {e}", flush=True)
+        print(f"[DEBUG] traceback: {traceback.format_exc()}", flush=True)
         if os.path.exists(temp_path):
             os.remove(temp_path)
         try:
