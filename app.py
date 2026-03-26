@@ -1217,27 +1217,27 @@ def import_campaign_clinics(campaign_id):
     try:
         file.save(temp_path)
         print(f"[DEBUG] file saved to {temp_path}", flush=True)
-        wb = load_workbook(temp_path)
-        print(f"[DEBUG] workbook loaded", flush=True)
+        wb = load_workbook(temp_path, read_only=True, data_only=True)
+        print(f"[DEBUG] workbook loaded (read_only)", flush=True)
         ws = wb.active
         os.remove(temp_path)
 
-        # 前三行 debug 資訊
+        # 前三行 debug 資訊 + 自動偵測 header 行：合併一次掃描，減少記憶體
         preview_rows = []
-        for r in ws.iter_rows(min_row=1, max_row=3, values_only=True):
-            preview_rows.append([str(v) if v is not None else '' for v in r])
-
-        # 自動偵測 header 行：掃描前 5 行，找到含「電話」的那行
         header_row_idx = None
         header = []
         for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=5, values_only=True), start=1):
-            stripped = [str(v).strip() if v is not None else '' for v in row]
-            if '電話' in stripped:
-                header_row_idx = row_idx
-                header = stripped
-                break
+            row = list(row)
+            if row_idx <= 3:
+                preview_rows.append([str(v) if v is not None else '' for v in row])
+            if header_row_idx is None:
+                stripped = [str(v).strip() if v is not None else '' for v in row]
+                if '電話' in stripped:
+                    header_row_idx = row_idx
+                    header = stripped
 
         if header_row_idx is None:
+            wb.close()
             print(f"[DEBUG] returning 400 找不到標題行, preview={preview_rows}", flush=True)
             return jsonify({
                 'error': '找不到含「電話」的標題行（掃描前 5 行）',
@@ -1378,6 +1378,7 @@ def import_campaign_clinics(campaign_id):
         # dry_run 模式：rollback 確保不寫入，回傳預覽結果
         if dry_run:
             print(f"[DEBUG] dry_run returning: would_create={new_clinics_count}, would_update={updated_count}, would_skip={already_in_campaign}, errors={len(errors)}, preview={len(preview_create+preview_update)}", flush=True)
+            wb.close()
             try:
                 db.session.rollback()
             except Exception:
@@ -1393,6 +1394,7 @@ def import_campaign_clinics(campaign_id):
             })
 
         print(f"[DEBUG] commit returning: new={new_clinics_count}, updated={updated_count}, recorded={recorded}, skip={already_in_campaign}, errors={len(errors)}", flush=True)
+        wb.close()
         db.session.commit()
         return jsonify({
             'success':             True,
@@ -1410,6 +1412,10 @@ def import_campaign_clinics(campaign_id):
         import traceback
         print(f"[DEBUG] exception caught: {type(e).__name__}: {e}", flush=True)
         print(f"[DEBUG] traceback: {traceback.format_exc()}", flush=True)
+        try:
+            wb.close()
+        except Exception:
+            pass
         if os.path.exists(temp_path):
             os.remove(temp_path)
         try:
