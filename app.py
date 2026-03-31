@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import text, func, case
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, date
 import os, re, math
@@ -746,35 +746,60 @@ def export_health_mall():
 @app.route('/api/analytics/stats')
 def get_analytics_stats():
     """整合統計 API：診所 + 健康醫購（不含已軟刪除）"""
-    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
-    hm_all  = HealthMall.query.all()
+    # 診所總數（DB 計算，不全撈）
+    total = Clinic.query.filter(Clinic.status != 'deleted').count()
 
-    # 診所總數與縣市分布
-    total = len(clinics)
-    region_count = Counter(c.region for c in clinics if c.region)
-    top_region = region_count.most_common(1)[0] if region_count else ('N/A', 0)
+    # 縣市分布（DB GROUP BY）
+    region_rows = (
+        db.session.query(Clinic.region, func.count(Clinic.id))
+        .filter(Clinic.status != 'deleted', Clinic.region.isnot(None))
+        .group_by(Clinic.region).all()
+    )
+    region_count = dict(region_rows)
+    top_region = max(region_count.items(), key=lambda x: x[1]) if region_count else ('N/A', 0)
 
-    # 科別分布
+    # 科別分布（仍需 Python 拆分逗號，但只撈需要的欄位）
+    specialty_rows = (
+        db.session.query(Clinic.specialties)
+        .filter(Clinic.status != 'deleted', Clinic.specialties.isnot(None))
+        .all()
+    )
     specialty_list = []
-    for c in clinics:
-        if c.specialties:
-            specialty_list.extend(s.strip() for s in c.specialties.split(',') if s.strip())
+    for (specialties,) in specialty_rows:
+        if specialties:
+            specialty_list.extend(s.strip() for s in specialties.split(',') if s.strip())
     specialty_count = Counter(specialty_list)
 
-    # 合作項目分布
+    # 合作項目分布（DB SUM/CASE，不全撈）
+    col_row = db.session.query(
+        func.sum(case((Clinic.col_yaodai  == True, 1), else_=0)).label('yaodai'),
+        func.sum(case((Clinic.col_haibao  == True, 1), else_=0)).label('haibao'),
+        func.sum(case((Clinic.col_paiyang == True, 1), else_=0)).label('paiyang'),
+        func.sum(case((Clinic.col_baiwei  == True, 1), else_=0)).label('baiwei'),
+    ).filter(Clinic.status != 'deleted').one()
     col_items = {
-        '藥袋':     sum(1 for c in clinics if c.col_yaodai),
-        '海報/立牌': sum(1 for c in clinics if c.col_haibao),
-        '派樣':     sum(1 for c in clinics if c.col_paiyang),
-        '百位':     sum(1 for c in clinics if c.col_baiwei),
+        '藥袋':     col_row.yaodai  or 0,
+        '海報/立牌': col_row.haibao  or 0,
+        '派樣':     col_row.paiyang or 0,
+        '百位':     col_row.baiwei  or 0,
     }
 
-    # 健康醫購（從獨立 table）
-    hm_total  = len(hm_all)
-    hm_active = sum(1 for h in hm_all if h.status == '合作中')
-    hm_paused = sum(1 for h in hm_all if h.status == '暫停')
-    hm_ended  = sum(1 for h in hm_all if h.status == '結束')
-    hm_region_count = Counter(h.region for h in hm_all if h.region)
+    # 健康醫購（DB GROUP BY status）
+    hm_total = HealthMall.query.count()
+    hm_status_rows = (
+        db.session.query(HealthMall.status, func.count(HealthMall.id))
+        .group_by(HealthMall.status).all()
+    )
+    hm_status_map = dict(hm_status_rows)
+    hm_active = hm_status_map.get('合作中', 0)
+    hm_paused = hm_status_map.get('暫停',   0)
+    hm_ended  = hm_status_map.get('結束',   0)
+    hm_region_rows = (
+        db.session.query(HealthMall.region, func.count(HealthMall.id))
+        .filter(HealthMall.region.isnot(None))
+        .group_by(HealthMall.region).all()
+    )
+    hm_region_count = dict(hm_region_rows)
 
     return jsonify({
         'total':            total,
@@ -782,11 +807,11 @@ def get_analytics_stats():
         'hm_active':        hm_active,
         'top_region':       top_region[0],
         'top_region_count': top_region[1],
-        'regions':      dict(region_count),
+        'regions':      region_count,
         'specialties':  dict(specialty_count),
         'col_items':    col_items,
         'hm_status':    {'合作中': hm_active, '暫停': hm_paused, '結束': hm_ended},
-        'hm_regions':   dict(hm_region_count),
+        'hm_regions':   hm_region_count,
     })
 
 @app.route('/api/analytics/regions')
@@ -1066,9 +1091,14 @@ def export_not_joined():
 @app.route('/api/campaigns', methods=['GET'])
 def get_campaigns():
     campaigns = Campaign.query.order_by(Campaign.year.desc(), Campaign.created_at.desc()).all()
+    # 一條 SQL 取得所有活動的診所數量，避免 N+1
+    counts = dict(
+        db.session.query(CampaignClinic.campaign_id, func.count(CampaignClinic.id))
+        .group_by(CampaignClinic.campaign_id)
+        .all()
+    )
     result = []
     for c in campaigns:
-        count = CampaignClinic.query.filter_by(campaign_id=c.id).count()
         result.append({
             'id':                c.id,
             'name':              c.name,
@@ -1078,7 +1108,7 @@ def get_campaigns():
             'note':              c.note or '',
             'cooperation_items': c.cooperation_items or '',
             'cooperation_other': c.cooperation_other or '',
-            'clinic_count':      count,
+            'clinic_count':      counts.get(c.id, 0),
             'created_at':        c.created_at.strftime('%Y-%m-%d') if c.created_at else '',
         })
     return jsonify(result)
@@ -1821,6 +1851,14 @@ with app.app_context():
             specialty VARCHAR(200),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
+        # 效能索引：常用篩選欄位
+        'CREATE INDEX IF NOT EXISTS idx_clinic_status ON clinic(status)',
+        'CREATE INDEX IF NOT EXISTS idx_clinic_region ON clinic(region)',
+        'CREATE INDEX IF NOT EXISTS idx_clinic_status_region ON clinic(status, region)',
+        'CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)',
+        'CREATE INDEX IF NOT EXISTS idx_campaign_clinic_campaign_id ON campaign_clinic(campaign_id)',
+        'CREATE INDEX IF NOT EXISTS idx_campaign_clinic_clinic_id ON campaign_clinic(clinic_id)',
     ]
     for _sql in _migrations:
         try:
