@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, func, case
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, date
-import os, re, math
+import os, re, math, hmac
 from collections import Counter
 from io import BytesIO
 from openpyxl import Workbook, load_workbook
@@ -24,8 +24,14 @@ if DATABASE_URL.startswith('postgres://'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB 上傳限制
 
 db = SQLAlchemy(app)
+
+
+@app.errorhandler(413)
+def file_too_large(e):
+    return jsonify({'success': False, 'error': '檔案過大，最大允許 10MB'}), 413
 
 
 # ── 資料模型 ─────────────────────────────────────────────────
@@ -173,13 +179,17 @@ def campaign_match_page():
 def login():
     if request.method == 'POST':
         data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        if username == 'admin' and password == os.environ.get('ADMIN_PASSWORD', 'local-admin'):
+        username = data.get('username', '')
+        password = data.get('password', '')
+        admin_password = os.environ.get('ADMIN_PASSWORD', '')
+        user_password  = os.environ.get('USER_PASSWORD', '')
+        if not admin_password or not user_password:
+            return jsonify({'error': '系統設定錯誤，請聯絡管理員'}), 500
+        if username == 'admin' and hmac.compare_digest(password, admin_password):
             session['user'] = 'admin'
             session['role'] = 'admin'
             return jsonify({'success': True})
-        elif username == 'user' and password == os.environ.get('USER_PASSWORD', 'local-user'):
+        elif username == 'user' and hmac.compare_digest(password, user_password):
             session['user'] = 'user'
             session['role'] = 'user'
             return jsonify({'success': True})
