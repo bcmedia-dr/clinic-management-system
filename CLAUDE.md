@@ -18,10 +18,12 @@ BCM/Bcmedia 診所管理系統，追蹤診所資料、合作項目、活動記�
 
 ### 2. 每次修改完必須 git push
 - 修改完程式碼後，一定要執行：
-  ```
+  ```bash
   git add . && git commit -m "說明" && git push
   ```
 - 沒有 push 就沒有部署，雲端不會更新
+- Remote URL 已內嵌 PAT，可直接 push 無需互動輸入
+- **此專案 repo：** `bcmedia-dr/clinic-management-system`（勿與醫師系統混淆）
 
 ## 系統六個分頁
 1. 診所管理 - 總表，CRUD，匯入/匯出
