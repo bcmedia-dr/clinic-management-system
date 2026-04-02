@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, func, case
+from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, date
 import os, re, math, hmac
@@ -393,18 +394,19 @@ def permanent_delete_clinic(clinic_id):
     """永久刪除：先清除關聯資料再真正刪除"""
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
-    clinic = Clinic.query.get_or_404(clinic_id)
-    clinic_name = clinic.name  # 先記錄名稱，因為刪除後無法取得
-    # 1. campaign_clinic：clinic_id NOT NULL → 刪除關聯記錄
-    CampaignClinic.query.filter_by(clinic_id=clinic_id).delete()
-    # 2. baiwei_doctor：clinic_id nullable → 設為 NULL，保留百位醫師資料
-    BaiweiDoctor.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
-    # 3. health_mall：clinic_id nullable → 設為 NULL，保留健康醫購資料
-    HealthMall.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
-    db.session.delete(clinic)
-    _write_audit('永久刪除', clinic_name, clinic_id)
-    db.session.commit()
-    return jsonify({'success': True})
+    try:
+        clinic = Clinic.query.get_or_404(clinic_id)
+        clinic_name = clinic.name  # 先記錄名稱，因為刪除後無法取得
+        CampaignClinic.query.filter_by(clinic_id=clinic_id).delete()
+        BaiweiDoctor.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
+        HealthMall.query.filter_by(clinic_id=clinic_id).update({'clinic_id': None})
+        db.session.delete(clinic)
+        _write_audit('永久刪除', clinic_name, clinic_id)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'刪除失敗: {str(e)}'}), 500
 
 
 @app.route('/api/clinics/deleted', methods=['GET'])
@@ -826,25 +828,35 @@ def get_analytics_stats():
 
 @app.route('/api/analytics/regions')
 def get_region_stats():
-    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
-    region_count = Counter(c.region for c in clinics if c.region)
-    return jsonify({'regions': list(region_count.keys()), 'counts': list(region_count.values())})
+    rows = (
+        db.session.query(Clinic.region, func.count(Clinic.id))
+        .filter(Clinic.status != 'deleted', Clinic.region.isnot(None))
+        .group_by(Clinic.region).all()
+    )
+    return jsonify({'regions': [r for r, _ in rows], 'counts': [c for _, c in rows]})
 
 @app.route('/api/analytics/specialties')
 def get_specialty_stats():
-    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
+    rows = (
+        db.session.query(Clinic.specialties)
+        .filter(Clinic.status != 'deleted', Clinic.specialties.isnot(None))
+        .all()
+    )
     specialty_list = []
-    for clinic in clinics:
-        if clinic.specialties:
-            specialty_list.extend(s.strip() for s in clinic.specialties.split(','))
+    for (specialties,) in rows:
+        if specialties:
+            specialty_list.extend(s.strip() for s in specialties.split(','))
     specialty_count = Counter(specialty_list)
     return jsonify({'specialties': list(specialty_count.keys()), 'counts': list(specialty_count.values())})
 
 @app.route('/api/analytics/taiwan_map')
 def get_taiwan_map_data():
-    clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
-    region_count = Counter(c.region for c in clinics if c.region)
-    return jsonify([{'name': r, 'value': v} for r, v in region_count.items()])
+    rows = (
+        db.session.query(Clinic.region, func.count(Clinic.id))
+        .filter(Clinic.status != 'deleted', Clinic.region.isnot(None))
+        .group_by(Clinic.region).all()
+    )
+    return jsonify([{'name': r, 'value': v} for r, v in rows])
 
 
 # ── 匯出/匯入 ────────────────────────────────────────────────
@@ -1189,7 +1201,10 @@ def get_campaign_clinics(campaign_id):
     Campaign.query.get_or_404(campaign_id)
     region    = request.args.get('region', '')
     specialty = request.args.get('specialty', '')
-    links = CampaignClinic.query.filter_by(campaign_id=campaign_id).all()
+    links = (CampaignClinic.query
+             .options(joinedload(CampaignClinic.clinic))
+             .filter_by(campaign_id=campaign_id)
+             .all())
     result = []
     for link in links:
         c = link.clinic
