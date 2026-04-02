@@ -6,6 +6,7 @@
     <title>統計分析 - Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
@@ -90,11 +91,6 @@
         .chart-wrap { position: relative; height: 280px; }
         .chart-wrap.tall { height: 340px; }
 
-        .loading {
-            display: flex; align-items: center; justify-content: center;
-            height: 280px; color: #999; font-size: 14px;
-        }
-
         .stat-select {
             width: 100%; margin: 6px 0 8px;
             padding: 5px 8px; border-radius: 6px;
@@ -103,6 +99,14 @@
             font-size: 13px; font-family: 'Noto Sans TC', sans-serif; cursor: pointer;
         }
         .stat-select option { color: #333; background: white; }
+
+        /* 空資料佔位 */
+        .empty-state {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100%; color: #bbb; font-size: 14px; gap: 8px;
+        }
+        .empty-state .empty-icon { font-size: 48px; opacity: 0.4; }
 
         @media (max-width: 900px) {
             .stats-row { grid-template-columns: repeat(2, 1fr); }
@@ -148,10 +152,9 @@
             </div>
             <div class="stat-card c3">
                 <div class="stat-icon">🏷️</div>
-                <div class="stat-label" id="hmStatusLabel">合作狀態</div>
+                <div class="stat-label" id="hmStatusLabel">合作中</div>
                 <select class="stat-select" id="hmStatusSelect" onchange="onHmStatusChange()">
-                    <option value="">請選擇狀態</option>
-                    <option value="合作中">合作中</option>
+                    <option value="合作中" selected>合作中</option>
                     <option value="暫停">暫停</option>
                     <option value="結束">結束</option>
                 </select>
@@ -173,18 +176,18 @@
                     <span class="dot" style="background:#667eea;"></span>
                     各縣市診所數量
                 </div>
-                <div class="chart-wrap">
+                <div class="chart-wrap tall">
                     <canvas id="chartRegion"></canvas>
                 </div>
             </div>
 
-            <!-- 2. 各科別比例 -->
+            <!-- 2. 各科別分布 -->
             <div class="chart-card">
                 <div class="chart-title">
                     <span class="dot" style="background:#f093fb;"></span>
-                    各科別比例
+                    各科別分布
                 </div>
-                <div class="chart-wrap">
+                <div class="chart-wrap tall">
                     <canvas id="chartSpecialty"></canvas>
                 </div>
             </div>
@@ -206,7 +209,7 @@
                     <span class="dot" style="background:#11998e;"></span>
                     健康醫購合作狀態
                 </div>
-                <div class="chart-wrap">
+                <div class="chart-wrap" id="hmStatusWrap">
                     <canvas id="chartHmStatus"></canvas>
                 </div>
             </div>
@@ -217,7 +220,7 @@
                     <span class="dot" style="background:#4facfe;"></span>
                     各縣市健康醫購診所數量
                 </div>
-                <div class="chart-wrap tall">
+                <div class="chart-wrap" id="hmRegionWrap">
                     <canvas id="chartHmRegion"></canvas>
                 </div>
             </div>
@@ -225,12 +228,16 @@
     </div>
 
     <script>
-        // Chart.js 全域預設
+        // 全域註冊 datalabels plugin
+        Chart.register(ChartDataLabels);
+
+        // Chart.js 全域預設：關閉 datalabels（按需啟用）
         Chart.defaults.font.family = "'Noto Sans TC', sans-serif";
         Chart.defaults.font.size = 13;
         Chart.defaults.color = '#555';
+        Chart.defaults.plugins.datalabels = { display: false };
 
-        let _hmStatusData = {};   // 儲存 hm_status 供選取器使用
+        let _hmStatusData = {};
         let _chartHmStatus = null;
 
         const COLORS = [
@@ -239,24 +246,35 @@
             '#30cfd0','#a18cd1','#fda085','#ffecd2','#96fbc4',
         ];
 
+        function showEmpty(wrapperId, message) {
+            const wrap = document.getElementById(wrapperId);
+            wrap.innerHTML =
+                '<div class="empty-state">' +
+                '<div class="empty-icon">📭</div>' +
+                '<div>' + message + '</div>' +
+                '</div>';
+        }
+
         async function loadAndRender() {
             try {
                 const res = await fetch('/api/analytics/stats');
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const d = await res.json();
 
                 // ── 數字卡片 ──
-                document.getElementById('kTotal').textContent      = d.total;
-                document.getElementById('kHmTotal').textContent    = d.hm_total;
+                document.getElementById('kTotal').textContent     = d.total;
+                document.getElementById('kHmTotal').textContent   = d.hm_total;
                 document.getElementById('kTopRegion').textContent  = d.top_region;
                 document.getElementById('kTopRegionCount').textContent = d.top_region_count + ' 間';
 
-                // 儲存合作狀態資料供選取器使用
                 _hmStatusData = d.hm_status;
+                // 預設顯示「合作中」數量
+                document.getElementById('kHmStatus').textContent = (_hmStatusData['合作中'] || 0) + ' 間';
 
-                // ── 1. 各縣市診所數（長條圖） ──
-                const regionLabels = Object.keys(d.regions);
-                const regionData   = Object.values(d.regions);
+                // ── 1. 各縣市診所數（水平長條圖，按數量排序） ──
+                const regionEntries = Object.entries(d.regions).sort((a, b) => b[1] - a[1]);
+                const regionLabels = regionEntries.map(e => e[0]);
+                const regionData   = regionEntries.map(e => e[1]);
                 new Chart(document.getElementById('chartRegion'), {
                     type: 'bar',
                     data: {
@@ -267,51 +285,68 @@
                             backgroundColor: regionLabels.map((_, i) => COLORS[i % COLORS.length] + 'cc'),
                             borderColor:     regionLabels.map((_, i) => COLORS[i % COLORS.length]),
                             borderWidth: 1,
-                            borderRadius: 6,
+                            borderRadius: 4,
                         }]
                     },
                     options: {
+                        indexAxis: 'y',
                         responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: {
+                            legend: { display: false },
+                            datalabels: {
+                                display: true,
+                                anchor: 'end', align: 'end',
+                                color: '#555', font: { size: 11, weight: '500' },
+                            }
+                        },
                         scales: {
-                            y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
-                            x: { grid: { display: false } }
+                            x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+                            y: { grid: { display: false } }
                         }
                     }
                 });
 
-                // ── 2. 各科別比例（圓餅圖） ──
-                const specLabels = Object.keys(d.specialties);
-                const specData   = Object.values(d.specialties);
+                // ── 2. 各科別分布（水平長條圖，已由後端降序排列） ──
+                const specEntries = Object.entries(d.specialties);
+                const specLabels = specEntries.map(e => e[0]);
+                const specData   = specEntries.map(e => e[1]);
                 new Chart(document.getElementById('chartSpecialty'), {
-                    type: 'doughnut',
+                    type: 'bar',
                     data: {
                         labels: specLabels,
                         datasets: [{
+                            label: '診所數',
                             data: specData,
-                            backgroundColor: specLabels.map((_, i) => COLORS[i % COLORS.length] + 'dd'),
-                            borderColor: '#fff',
-                            borderWidth: 2,
+                            backgroundColor: specLabels.map((_, i) => COLORS[i % COLORS.length] + 'cc'),
+                            borderColor:     specLabels.map((_, i) => COLORS[i % COLORS.length]),
+                            borderWidth: 1,
+                            borderRadius: 4,
                         }]
                     },
                     options: {
+                        indexAxis: 'y',
                         responsive: true, maintainAspectRatio: false,
                         plugins: {
-                            legend: { position: 'right', labels: { boxWidth: 14, padding: 12 } },
-                            tooltip: {
-                                callbacks: {
-                                    label: ctx => ` ${ctx.label}：${ctx.parsed} 間`
-                                }
+                            legend: { display: false },
+                            datalabels: {
+                                display: true,
+                                anchor: 'end', align: 'end',
+                                color: '#555', font: { size: 11, weight: '500' },
                             }
+                        },
+                        scales: {
+                            x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+                            y: { grid: { display: false } }
                         }
                     }
                 });
 
-                // ── 3. 合作項目分布（水平長條圖） ──
+                // ── 3. 合作項目分布（水平長條圖 + 數字標籤） ──
                 const colLabels = Object.keys(d.col_items);
                 const colData   = Object.values(d.col_items);
                 const colColors = ['#fff3cd', '#d4edda', '#cce5ff', '#f8d7da'];
                 const colBorders = ['#856404', '#155724', '#004085', '#721c24'];
+                const colTotal = colData.reduce((a, b) => a + b, 0) || 1;
                 new Chart(document.getElementById('chartColItems'), {
                     type: 'bar',
                     data: {
@@ -328,51 +363,73 @@
                     options: {
                         indexAxis: 'y',
                         responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: {
+                            legend: { display: false },
+                            datalabels: {
+                                display: true,
+                                anchor: 'end', align: 'end',
+                                color: '#333', font: { size: 12, weight: '700' },
+                                formatter: function(value) {
+                                    var pct = Math.round(value / colTotal * 100);
+                                    return value + ' (' + pct + '%)';
+                                }
+                            }
+                        },
                         scales: {
-                            x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                            x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
                             y: { grid: { display: false } }
                         }
                     }
                 });
 
                 // ── 4. 健康醫購合作狀態（圓餅圖） ──
-                const hmStatusLabels  = Object.keys(d.hm_status);
-                const hmStatusData    = Object.values(d.hm_status);
-                const hmStatusColors  = ['#d4edda', '#fff3cd', '#f8d7da'];
-                const hmStatusBorders = ['#155724', '#856404', '#721c24'];
-                _chartHmStatus = new Chart(document.getElementById('chartHmStatus'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: hmStatusLabels,
-                        datasets: [{
-                            data: hmStatusData,
-                            backgroundColor: hmStatusColors,
-                            borderColor: hmStatusBorders,
-                            borderWidth: 2,
-                        }]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'right', labels: { boxWidth: 14, padding: 16 } },
-                            tooltip: {
-                                callbacks: {
-                                    label: ctx => ` ${ctx.label}：${ctx.parsed} 間`
+                var hmTotal = (d.hm_status['合作中'] || 0) + (d.hm_status['暫停'] || 0) + (d.hm_status['結束'] || 0);
+                if (hmTotal === 0) {
+                    showEmpty('hmStatusWrap', '尚無健康醫購合作資料');
+                } else {
+                    var hmStatusLabels  = Object.keys(d.hm_status);
+                    var hmStatusData    = Object.values(d.hm_status);
+                    var hmStatusColors  = ['#d4edda', '#fff3cd', '#f8d7da'];
+                    var hmStatusBorders = ['#155724', '#856404', '#721c24'];
+                    _chartHmStatus = new Chart(document.getElementById('chartHmStatus'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: hmStatusLabels,
+                            datasets: [{
+                                data: hmStatusData,
+                                backgroundColor: hmStatusColors,
+                                borderColor: hmStatusBorders,
+                                borderWidth: 2,
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'right', labels: { boxWidth: 14, padding: 16 } },
+                                datalabels: {
+                                    display: true,
+                                    color: '#333', font: { size: 12, weight: '700' },
+                                    formatter: function(value) { return value > 0 ? value : ''; }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(ctx) { return ' ' + ctx.label + '：' + ctx.parsed + ' 間'; }
+                                    }
                                 }
                             }
                         }
-                    }
-                });
+                    });
+                    // 預設高亮「合作中」
+                    onHmStatusChange();
+                }
 
                 // ── 5. 各縣市健康醫購數（長條圖，全寬） ──
-                const hmRegionLabels = Object.keys(d.hm_regions);
-                const hmRegionData   = Object.values(d.hm_regions);
-
-                if (hmRegionLabels.length === 0) {
-                    document.getElementById('chartHmRegion').parentElement.innerHTML =
-                        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:14px;">尚無健康醫購診所資料</div>';
+                var hmRegionEntries = Object.entries(d.hm_regions).sort(function(a, b) { return b[1] - a[1]; });
+                if (hmRegionEntries.length === 0) {
+                    showEmpty('hmRegionWrap', '尚無健康醫購診所資料');
                 } else {
+                    var hmRegionLabels = hmRegionEntries.map(function(e) { return e[0]; });
+                    var hmRegionData   = hmRegionEntries.map(function(e) { return e[1]; });
                     new Chart(document.getElementById('chartHmRegion'), {
                         type: 'bar',
                         data: {
@@ -388,10 +445,20 @@
                         },
                         options: {
                             responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
+                            plugins: {
+                                legend: { display: false },
+                                datalabels: {
+                                    display: true,
+                                    anchor: 'end', align: 'end',
+                                    color: '#555', font: { size: 11, weight: '500' },
+                                }
+                            },
                             scales: {
-                                y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
-                                x: { grid: { display: false } }
+                                y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+                                x: {
+                                    grid: { display: false },
+                                    ticks: { maxRotation: 45, minRotation: 0 }
+                                }
                             }
                         }
                     });
@@ -400,31 +467,26 @@
             } catch (err) {
                 console.error('載入統計失敗:', err);
                 document.querySelector('.container').innerHTML +=
-                    `<div style="color:red;padding:20px;">載入統計資料失敗：${err.message}</div>`;
+                    '<div style="color:red;padding:20px;">載入統計資料失敗：' + err.message + '</div>';
             }
         }
 
         function onHmStatusChange() {
-            const status = document.getElementById('hmStatusSelect').value;
-            const label  = document.getElementById('hmStatusLabel');
-            const value  = document.getElementById('kHmStatus');
+            var status = document.getElementById('hmStatusSelect').value;
+            var label  = document.getElementById('hmStatusLabel');
+            var value  = document.getElementById('kHmStatus');
 
-            if (status) {
-                label.textContent = status;
-                value.textContent = (_hmStatusData[status] ?? 0) + ' 間';
-            } else {
-                label.textContent = '合作狀態';
-                value.textContent = '—';
-            }
+            label.textContent = status;
+            value.textContent = (_hmStatusData[status] || 0) + ' 間';
 
             // 更新圓餅圖：選取狀態時該 slice 加深，其餘變淡
             if (!_chartHmStatus) return;
-            const allLabels = ['合作中', '暫停', '結束'];
-            const allColors  = ['#d4edda', '#fff3cd', '#f8d7da'];
-            const dimColors  = ['#d4edda55', '#fff3cd55', '#f8d7da55'];
-            _chartHmStatus.data.datasets[0].backgroundColor = allLabels.map((l, i) =>
-                !status || l === status ? allColors[i] : dimColors[i]
-            );
+            var allLabels = ['合作中', '暫停', '結束'];
+            var allColors  = ['#d4edda', '#fff3cd', '#f8d7da'];
+            var dimColors  = ['#d4edda55', '#fff3cd55', '#f8d7da55'];
+            _chartHmStatus.data.datasets[0].backgroundColor = allLabels.map(function(l, i) {
+                return l === status ? allColors[i] : dimColors[i];
+            });
             _chartHmStatus.update();
         }
 

@@ -774,7 +774,7 @@ def get_analytics_stats():
     region_count = dict(region_rows)
     top_region = max(region_count.items(), key=lambda x: x[1]) if region_count else ('N/A', 0)
 
-    # 科別分布（仍需 Python 拆分逗號，但只撈需要的欄位）
+    # 科別分布（拆解組合科別，用 / 分割為個別科別計數）
     specialty_rows = (
         db.session.query(Clinic.specialties)
         .filter(Clinic.status != 'deleted', Clinic.specialties.isnot(None))
@@ -783,8 +783,13 @@ def get_analytics_stats():
     specialty_list = []
     for (specialties,) in specialty_rows:
         if specialties:
-            specialty_list.extend(s.strip() for s in specialties.split(',') if s.strip())
+            for s in re.split(r'[/,]', specialties):
+                s = s.strip()
+                if s:
+                    specialty_list.append(s)
     specialty_count = Counter(specialty_list)
+    # 按數量降序排列
+    specialty_count = dict(specialty_count.most_common())
 
     # 合作項目分布（DB SUM/CASE，不全撈）
     col_row = db.session.query(
@@ -849,7 +854,10 @@ def get_specialty_stats():
     specialty_list = []
     for (specialties,) in rows:
         if specialties:
-            specialty_list.extend(s.strip() for s in specialties.split(','))
+            for s in re.split(r'[/,]', specialties):
+                s = s.strip()
+                if s:
+                    specialty_list.append(s)
     specialty_count = Counter(specialty_list)
     return jsonify({'specialties': list(specialty_count.keys()), 'counts': list(specialty_count.values())})
 
