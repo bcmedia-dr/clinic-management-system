@@ -42,7 +42,6 @@ class Clinic(db.Model):
     region           = db.Column(db.String(50))
     district         = db.Column(db.String(50))
     name             = db.Column(db.String(200))
-    media_items      = db.Column(db.String(500))                    # 舊欄位（保留）
     specialties      = db.Column(db.String(500))
     address          = db.Column(db.String(300))
     phone            = db.Column(db.String(50))
@@ -518,24 +517,29 @@ def get_clinic_duplicates():
         s = _re.sub(r'診所|醫院|醫學中心|聯合|附設|小兒科|家醫科|耳鼻喉科|內科|外科|皮膚科|婦產科|中醫', '', name or '')
         return s.strip()
 
-    all_clinics = Clinic.query.filter(Clinic.status != 'deleted').order_by(Clinic.id).all()
+    # 只撈 _brief() 需要的 5 個欄位，不撈 SELECT *
+    all_rows = (
+        db.session.query(Clinic.id, Clinic.name, Clinic.phone, Clinic.region, Clinic.district)
+        .filter(Clinic.status != 'deleted')
+        .order_by(Clinic.id).all()
+    )
     simplified_groups = defaultdict(list)
-    for c in all_clinics:
-        if c.name:
-            s = simplify(c.name)
+    for r in all_rows:
+        if r.name:
+            s = simplify(r.name)
             if s:
-                simplified_groups[s].append(c)
+                simplified_groups[s].append(r)
 
     similar = []
-    for simplified, clinics in simplified_groups.items():
-        if len(clinics) > 1:
-            names = {c.name for c in clinics}
+    for simplified, rows in simplified_groups.items():
+        if len(rows) > 1:
+            names = {r.name for r in rows}
             if len(names) == 1 and list(names)[0] in exact_name_set:
                 continue
             similar.append({
                 'simplified': simplified,
-                'count':      len(clinics),
-                'clinics':    [_brief(c) for c in clinics],
+                'count':      len(rows),
+                'clinics':    [_brief(r) for r in rows],
             })
 
     return jsonify({'exact': exact, 'similar': similar})
@@ -1028,26 +1032,40 @@ def campaign_match():
                 'phone_n':  _normalize_phone(phone_fmt),              # 再 normalize → 完整含區碼數字
             })
 
-        clinics = Clinic.query.filter(Clinic.status != 'deleted').all()
-        # 用 phone_normalized 欄位建立比對表（已是 format_phone 後的完整含區碼數字）
-        # 避免 c.phone 格式不一（有些無區碼）導致 normalize 結果碼數不同
-        phone_to_clinic = {c.phone_normalized: c for c in clinics if c.phone_normalized}
+        # 只撈比對需要的欄位，減少資料傳輸量
+        clinic_rows = (
+            db.session.query(
+                Clinic.id, Clinic.region, Clinic.district, Clinic.name,
+                Clinic.specialties, Clinic.address, Clinic.phone,
+                Clinic.contact_person, Clinic.phone_normalized
+            )
+            .filter(Clinic.status != 'deleted')
+            .all()
+        )
+        def _row_brief(r):
+            return {
+                'id': r.id, 'region': r.region or '', 'district': r.district or '',
+                'name': r.name or '', 'specialties': r.specialties or '',
+                'address': r.address or '', 'phone': r.phone or '',
+                'contact_person': r.contact_person or '',
+            }
+        phone_to_row = {r.phone_normalized: r for r in clinic_rows if r.phone_normalized}
 
         uploaded_phones = {u['phone_n'] for u in uploaded if u['phone_n']}
 
         matched = []
         for u in uploaded:
-            if u['phone_n'] and u['phone_n'] in phone_to_clinic:
-                matched.append(_clinic_brief(phone_to_clinic[u['phone_n']]))
+            if u['phone_n'] and u['phone_n'] in phone_to_row:
+                matched.append(_row_brief(phone_to_row[u['phone_n']]))
 
         not_joined = []
-        for c in clinics:
-            if not c.phone_normalized or c.phone_normalized not in uploaded_phones:
-                not_joined.append(_clinic_brief(c))
+        for r in clinic_rows:
+            if not r.phone_normalized or r.phone_normalized not in uploaded_phones:
+                not_joined.append(_row_brief(r))
 
         not_in_system = []
         for u in uploaded:
-            if not u['phone_n'] or u['phone_n'] not in phone_to_clinic:
+            if not u['phone_n'] or u['phone_n'] not in phone_to_row:
                 not_in_system.append({
                     'region':   u['region'],
                     'district': u['district'],
@@ -1884,6 +1902,8 @@ with app.app_context():
         'CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)',
         'CREATE INDEX IF NOT EXISTS idx_campaign_clinic_campaign_id ON campaign_clinic(campaign_id)',
         'CREATE INDEX IF NOT EXISTS idx_campaign_clinic_clinic_id ON campaign_clinic(clinic_id)',
+        # 移除廢棄欄位（已被 col_yaodai/col_haibao/col_paiyang/col_baiwei 取代）
+        'ALTER TABLE clinic DROP COLUMN IF EXISTS media_items',
     ]
     for _sql in _migrations:
         try:
