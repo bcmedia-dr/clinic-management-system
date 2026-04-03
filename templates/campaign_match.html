@@ -14,6 +14,10 @@
             --bg: #f5f7fa; --text: #333; --card: white; --border: #e5e5e5;
             --muted: #888; --hover: #fafafa;
         }
+        html.dark {
+            --bg: #1a1a2e; --text: #e0e0e0; --card: #16213e; --border: #2a2a4a;
+            --muted: #777; --hover: #1e2a4a;
+        }
 
         /* ── Header ── */
         .header {
@@ -187,6 +191,7 @@
             .upload-row { flex-direction: column; }
         }
     </style>
+    <script>if(localStorage.getItem('dark')==='1')document.documentElement.classList.add('dark');</script>
 </head>
 <body>
 <div class="header">
@@ -195,7 +200,10 @@
             <div class="logo">🎯</div>
             <h1>活動比對</h1>
         </div>
-        <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+        <div style="display:flex;gap:8px;">
+            <button class="btn-logout" id="darkBtn" onclick="toggleDark()">🌙 深色</button>
+            <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+        </div>
     </div>
     <div class="nav">
         <a href="/" class="nav-btn">📋 診所管理</a>
@@ -330,6 +338,17 @@
 </div>
 
 <script>
+    function toggleDark() {
+        var on = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('dark', on ? '1' : '0');
+        var btn = document.getElementById('darkBtn');
+        if (btn) btn.textContent = on ? '☀️ 亮色' : '🌙 深色';
+    }
+    (function() {
+        var btn = document.getElementById('darkBtn');
+        if (btn && document.documentElement.classList.contains('dark')) btn.textContent = '☀️ 亮色';
+    })();
+
     let _notJoined = [];
     let _pieChart = null;
 

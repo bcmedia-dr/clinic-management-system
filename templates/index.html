@@ -13,14 +13,12 @@
             --table-head: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --shadow: rgba(0,0,0,0.05); --shadow2: rgba(0,0,0,0.1);
         }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa;
-                --border: #2a2a4a; --border2: #2a2a4a; --muted: #777;
-                --hover: #1e2a4a; --input-bg: #1e2a4a; --input-border: #3a3a5a;
-                --table-head: linear-gradient(135deg, #4a5a8a 0%, #5a4a7a 100%);
-                --shadow: rgba(0,0,0,0.2); --shadow2: rgba(0,0,0,0.3);
-            }
+        html.dark {
+            --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa;
+            --border: #2a2a4a; --border2: #2a2a4a; --muted: #777;
+            --hover: #1e2a4a; --input-bg: #1e2a4a; --input-border: #3a3a5a;
+            --table-head: linear-gradient(135deg, #4a5a8a 0%, #5a4a7a 100%);
+            --shadow: rgba(0,0,0,0.2); --shadow2: rgba(0,0,0,0.3);
         }
 
         * {
@@ -639,6 +637,7 @@
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
         }
     </style>
+    <script>if(localStorage.getItem('dark')==='1')document.documentElement.classList.add('dark');</script>
 </head>
 <body>
     <div class="header">
@@ -652,6 +651,7 @@
                     <span>👤</span>
                     <span id="username"></span>
                 </div>
+                <button class="btn-logout" id="darkBtn" onclick="toggleDark()">🌙 深色</button>
                 <button class="btn-logout" onclick="logout()">🚪 登出</button>
             </div>
         </div>
@@ -1054,6 +1054,17 @@
     </div>
 
     <script>
+        function toggleDark() {
+            var on = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('dark', on ? '1' : '0');
+            var btn = document.getElementById('darkBtn');
+            if (btn) btn.textContent = on ? '☀️ 亮色' : '🌙 深色';
+        }
+        (function() {
+            var btn = document.getElementById('darkBtn');
+            if (btn && document.documentElement.classList.contains('dark')) btn.textContent = '☀️ 亮色';
+        })();
+
         let currentEditId = null;
         let _searchTimer = null;
         let currentPage = 1;          // 目前頁碼（伺服器端分頁）

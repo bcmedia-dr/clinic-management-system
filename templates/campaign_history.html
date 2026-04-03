@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #f5f7fa; --card: #fff; --text: #333; --text2: #555; --border: #e0e0e0; --border2: #f0f0f0; --muted: #999; --hover: #f8f9fa; --input-bg: #fff; --input-border: #e0e0e0; --shadow: rgba(0,0,0,0.05); }
-        @media (prefers-color-scheme: dark) { :root { --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa; --border: #2a2a4a; --border2: #2a2a4a; --muted: #777; --hover: #1e2a4a; --input-bg: #1e2a4a; --input-border: #3a3a5a; --shadow: rgba(0,0,0,0.2); } }
+        html.dark { --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa; --border: #2a2a4a; --border2: #2a2a4a; --muted: #777; --hover: #1e2a4a; --input-bg: #1e2a4a; --input-border: #3a3a5a; --shadow: rgba(0,0,0,0.2); }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); }
 
@@ -274,6 +274,7 @@
         }
         .campaign-item-coop { margin-top: 4px; }
     </style>
+    <script>if(localStorage.getItem('dark')==='1')document.documentElement.classList.add('dark');</script>
 </head>
 <body>
     <div class="header">
@@ -283,6 +284,7 @@
                 <h1>Bcmedia 診所管理系統</h1>
             </div>
             <div class="header-right">
+                <button class="btn-logout" id="darkBtn" onclick="toggleDark()">🌙 深色</button>
                 <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
             </div>
         </div>
@@ -555,6 +557,17 @@
     </div>
 
     <script>
+        function toggleDark() {
+            var on = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('dark', on ? '1' : '0');
+            var btn = document.getElementById('darkBtn');
+            if (btn) btn.textContent = on ? '☀️ 亮色' : '🌙 深色';
+        }
+        (function() {
+            var btn = document.getElementById('darkBtn');
+            if (btn && document.documentElement.classList.contains('dark')) btn.textContent = '☀️ 亮色';
+        })();
+
         let currentCampaignId   = null;
         let currentCampaignName = '';
         let allCampaigns        = [];   // 儲存所有活動資料，供編輯活動 modal 使用

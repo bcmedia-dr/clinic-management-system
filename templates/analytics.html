@@ -14,11 +14,9 @@
             --bg: #f5f7fa; --card: #fff; --text: #333; --text2: #555;
             --border: #f0f0f0; --muted: #999; --shadow: rgba(0,0,0,0.05);
         }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa;
-                --border: #2a2a4a; --muted: #777; --shadow: rgba(0,0,0,0.2);
-            }
+        html.dark {
+            --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa;
+            --border: #2a2a4a; --muted: #777; --shadow: rgba(0,0,0,0.2);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); }
@@ -126,6 +124,7 @@
             .chart-full { grid-column: auto; }
         }
     </style>
+    <script>if(localStorage.getItem('dark')==='1')document.documentElement.classList.add('dark');</script>
 </head>
 <body>
     <div class="header">
@@ -135,6 +134,7 @@
                 <h1>統計分析</h1>
             </div>
             <div class="header-right">
+                <button class="btn-logout" id="darkBtn" onclick="toggleDark()">🌙 深色</button>
                 <button class="btn-logout" onclick="exportPDF()" id="btnPdf">📄 匯出 PDF</button>
                 <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
             </div>
@@ -241,6 +241,17 @@
     </div>
 
     <script>
+        function toggleDark() {
+            var on = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('dark', on ? '1' : '0');
+            var btn = document.getElementById('darkBtn');
+            if (btn) btn.textContent = on ? '☀️ 亮色' : '🌙 深色';
+        }
+        (function() {
+            var btn = document.getElementById('darkBtn');
+            if (btn && document.documentElement.classList.contains('dark')) btn.textContent = '☀️ 亮色';
+        })();
+
         // 全域註冊 datalabels plugin
         Chart.register(ChartDataLabels);
 
