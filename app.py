@@ -120,6 +120,18 @@ class BaiweiDoctor(db.Model):
     clinic = db.relationship('Clinic', backref=db.backref('baiwei_doctors', lazy=True))
 
 
+class MatchHistory(db.Model):
+    """活動比對歷史：儲存每次比對的結果摘要"""
+    __tablename__ = 'match_history'
+    id             = db.Column(db.Integer, primary_key=True)
+    campaign_name  = db.Column(db.String(200))
+    matched_count  = db.Column(db.Integer, default=0)
+    not_joined_count   = db.Column(db.Integer, default=0)
+    not_in_system_count = db.Column(db.Integer, default=0)
+    result_json    = db.Column(db.Text)    # 完整比對結果 JSON
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class AuditLog(db.Model):
     """操作記錄：記錄診所的新增、編輯、刪除等操作"""
     __tablename__ = 'audit_log'
@@ -220,15 +232,18 @@ def get_clinics():
     city        = request.args.get('city',        '').strip()  # 縣市篩選
     specialty   = request.args.get('specialty',   '').strip()
     cooperation = request.args.get('cooperation', '').strip()  # 合作項目篩選
+    sort_by     = request.args.get('sort',        '').strip()  # 排序欄位
+    sort_dir    = request.args.get('dir',         'asc').strip().lower()  # asc / desc
 
     # 只顯示未軟刪除的診所
     query = Clinic.query.filter(Clinic.status != 'deleted')
 
     if search:
-        # 搜尋診所名稱或電話
+        # 搜尋診所名稱、電話或聯絡人
         query = query.filter(
             (Clinic.name.contains(search)) |
-            (Clinic.phone.contains(search))
+            (Clinic.phone.contains(search)) |
+            (Clinic.contact_person.contains(search))
         )
     if city:
         query = query.filter(Clinic.region == city)
@@ -243,11 +258,20 @@ def get_clinics():
     elif cooperation == 'baiwei':
         query = query.filter(Clinic.col_baiwei == True)
 
+    # 排序
+    _sort_map = {
+        'id': Clinic.id, 'region': Clinic.region, 'district': Clinic.district,
+        'name': Clinic.name, 'specialties': Clinic.specialties,
+        'phone': Clinic.phone, 'contact_person': Clinic.contact_person,
+    }
+    sort_col = _sort_map.get(sort_by, Clinic.id)
+    order = sort_col.desc() if sort_dir == 'desc' else sort_col.asc()
+
     # 先算總筆數，再做分頁切片
     total       = query.count()
     total_pages = max(1, math.ceil(total / per_page))
     page        = min(page, total_pages)  # 防止超出頁數
-    clinics     = query.order_by(Clinic.id).offset((page - 1) * per_page).limit(per_page).all()
+    clinics     = query.order_by(order).offset((page - 1) * per_page).limit(per_page).all()
 
     def _fmt(c):
         return {
@@ -362,6 +386,49 @@ def update_clinic(clinic_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'更新失敗: {str(e)}'}), 500
+
+@app.route('/api/clinics/batch-edit', methods=['PUT'])
+def batch_edit_clinics():
+    """批次編輯多筆診所的縣市、科別、合作項目"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    try:
+        data = request.get_json()
+        ids = data.get('ids', [])
+        if not ids:
+            return jsonify({'error': '未選擇診所'}), 400
+
+        fields = data.get('fields', {})
+        if not fields:
+            return jsonify({'error': '未指定修改內容'}), 400
+
+        clinics = Clinic.query.filter(Clinic.id.in_(ids), Clinic.status != 'deleted').all()
+        if not clinics:
+            return jsonify({'error': '未找到符合的診所'}), 404
+
+        updated = 0
+        for clinic in clinics:
+            if 'region' in fields and fields['region']:
+                clinic.region = fields['region']
+            if 'specialties' in fields and fields['specialties']:
+                clinic.specialties = fields['specialties']
+            if 'col_yaodai' in fields:
+                clinic.col_yaodai = fields['col_yaodai']
+            if 'col_haibao' in fields:
+                clinic.col_haibao = fields['col_haibao']
+            if 'col_paiyang' in fields:
+                clinic.col_paiyang = fields['col_paiyang']
+            if 'col_baiwei' in fields:
+                clinic.col_baiwei = fields['col_baiwei']
+            updated += 1
+
+        _write_audit('批次編輯', f'共 {updated} 筆', 0, f'修改欄位: {list(fields.keys())}')
+        db.session.commit()
+        return jsonify({'success': True, 'updated': updated})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'批次編輯失敗: {str(e)}'}), 500
+
 
 @app.route('/api/clinics/<int:clinic_id>', methods=['DELETE'])
 def delete_clinic(clinic_id):
@@ -1081,16 +1148,66 @@ def campaign_match():
                     'phone':    u['phone'],
                 })
 
-        return jsonify({
+        result = {
             'matched':       matched,
             'not_joined':    not_joined,
             'not_in_system': not_in_system,
-        })
+        }
+
+        # 儲存比對歷史
+        campaign_name = request.form.get('campaign_name', file.filename or '未命名')
+        import json as _json
+        history = MatchHistory(
+            campaign_name=campaign_name,
+            matched_count=len(matched),
+            not_joined_count=len(not_joined),
+            not_in_system_count=len(not_in_system),
+            result_json=_json.dumps(result, ensure_ascii=False),
+        )
+        db.session.add(history)
+        db.session.commit()
+        result['history_id'] = history.id
+
+        return jsonify(result)
 
     except Exception as e:
         if os.path.exists(temp_path):
             os.remove(temp_path)
         return jsonify({'error': f'比對失敗: {str(e)}'}), 500
+
+
+@app.route('/api/campaign/match-history', methods=['GET'])
+def list_match_history():
+    """列出比對歷史記錄（最新在前）"""
+    rows = MatchHistory.query.order_by(MatchHistory.created_at.desc()).limit(50).all()
+    return jsonify([{
+        'id': r.id,
+        'campaign_name': r.campaign_name,
+        'matched_count': r.matched_count,
+        'not_joined_count': r.not_joined_count,
+        'not_in_system_count': r.not_in_system_count,
+        'created_at': r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '',
+    } for r in rows])
+
+
+@app.route('/api/campaign/match-history/<int:history_id>', methods=['GET'])
+def get_match_history(history_id):
+    """取得單筆比對歷史的完整結果"""
+    import json as _json
+    row = MatchHistory.query.get_or_404(history_id)
+    result = _json.loads(row.result_json) if row.result_json else {}
+    result['campaign_name'] = row.campaign_name
+    result['created_at'] = row.created_at.strftime('%Y-%m-%d %H:%M') if row.created_at else ''
+    return jsonify(result)
+
+
+@app.route('/api/campaign/match-history/<int:history_id>', methods=['DELETE'])
+def delete_match_history(history_id):
+    """刪除單筆比對歷史"""
+    row = MatchHistory.query.get_or_404(history_id)
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({'success': True})
 
 
 @app.route('/api/campaign/export-not-joined')
@@ -1912,6 +2029,16 @@ with app.app_context():
         'CREATE INDEX IF NOT EXISTS idx_campaign_clinic_clinic_id ON campaign_clinic(clinic_id)',
         # 移除廢棄欄位（已被 col_yaodai/col_haibao/col_paiyang/col_baiwei 取代）
         'ALTER TABLE clinic DROP COLUMN IF EXISTS media_items',
+        # 比對歷史記錄表
+        """CREATE TABLE IF NOT EXISTS match_history (
+            id SERIAL PRIMARY KEY,
+            campaign_name VARCHAR(200),
+            matched_count INTEGER DEFAULT 0,
+            not_joined_count INTEGER DEFAULT 0,
+            not_in_system_count INTEGER DEFAULT 0,
+            result_json TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
     for _sql in _migrations:
         try:

@@ -6,6 +6,23 @@
     <title>Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #f5f7fa; --card: #fff; --text: #333; --text2: #555;
+            --border: #e0e0e0; --border2: #f0f0f0; --muted: #999;
+            --hover: #f8f9fa; --input-bg: #fff; --input-border: #e0e0e0;
+            --table-head: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --shadow: rgba(0,0,0,0.05); --shadow2: rgba(0,0,0,0.1);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa;
+                --border: #2a2a4a; --border2: #2a2a4a; --muted: #777;
+                --hover: #1e2a4a; --input-bg: #1e2a4a; --input-border: #3a3a5a;
+                --table-head: linear-gradient(135deg, #4a5a8a 0%, #5a4a7a 100%);
+                --shadow: rgba(0,0,0,0.2); --shadow2: rgba(0,0,0,0.3);
+            }
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,8 +31,8 @@
 
         body {
             font-family: 'Noto Sans TC', sans-serif;
-            background: #f5f7fa;
-            color: #333;
+            background: var(--bg);
+            color: var(--text);
         }
 
         .header {
@@ -77,6 +94,18 @@
 
         .field-error-border { border-color: #dc3545 !important; }
         .field-error-msg { color: #dc3545; font-size: 12px; margin-top: 4px; }
+
+        /* 可排序表頭 */
+        th.sortable { cursor: pointer; user-select: none; transition: background 0.2s; }
+        th.sortable:hover { background: rgba(255,255,255,0.15); }
+        th.sortable .sort-icon { font-size: 11px; opacity: 0.5; margin-left: 2px; }
+        th.sortable.asc .sort-icon { opacity: 1; }
+        th.sortable.desc .sort-icon { opacity: 1; }
+        th.sortable.asc .sort-icon::after { content: ''; }
+        th.sortable.desc .sort-icon::after { content: ''; }
+
+        /* 搜尋高亮 */
+        mark.hl { background: #ffe066; color: #333; padding: 0 1px; border-radius: 2px; }
 
         .pagination-bar {
             display: flex;
@@ -141,10 +170,10 @@
         }
 
         .stat-card {
-            background: white;
+            background: var(--card);
             padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 2px 10px var(--shadow);
             transition: all 0.3s;
         }
 
@@ -175,10 +204,10 @@
         }
 
         .controls {
-            background: white;
+            background: var(--card);
             padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 2px 10px var(--shadow);
             margin-bottom: 20px;
         }
 
@@ -197,19 +226,22 @@
         .search-box input {
             width: 100%;
             padding: 12px 16px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid var(--input-border);
             border-radius: 10px;
             font-size: 15px;
             font-family: 'Noto Sans TC', sans-serif;
+            background: var(--input-bg);
+            color: var(--text);
         }
 
         .filter-select {
             padding: 12px 16px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid var(--input-border);
             border-radius: 10px;
             font-size: 15px;
             font-family: 'Noto Sans TC', sans-serif;
-            background: white;
+            background: var(--input-bg);
+            color: var(--text);
             cursor: pointer;
         }
 
@@ -280,9 +312,9 @@
         }
 
         .table-container {
-            background: white;
+            background: var(--card);
             border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 2px 10px var(--shadow);
             overflow-x: auto;
             overflow-y: visible;
         }
@@ -295,7 +327,7 @@
         }
 
         thead {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--table-head);
             color: white;
         }
 
@@ -320,7 +352,7 @@
 
         td {
             padding: 12px 10px;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--border2);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -340,7 +372,7 @@
         }
 
         tbody tr:hover {
-            background: #f8f9fa;
+            background: var(--hover);
         }
 
         td:nth-child(6) { /* 科別 */
@@ -436,7 +468,7 @@
 
         .detail-content {
             padding: 15px 20px;
-            background: #f8f9fa;
+            background: var(--hover);
             border-left: 4px solid #4ade80;
         }
 
@@ -457,9 +489,9 @@
             display: flex;
             flex-direction: column;
             padding: 12px;
-            background: white;
+            background: var(--card);
             border-radius: 8px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border);
         }
 
         .detail-item label {
@@ -496,7 +528,7 @@
         }
 
         .modal-content {
-            background: white;
+            background: var(--card);
             max-width: 600px;
             margin: 50px auto;
             border-radius: 20px;
@@ -526,7 +558,7 @@
 
         .modal-header h2 {
             font-size: 24px;
-            color: #333;
+            color: var(--text);
         }
 
         .close-btn {
@@ -549,7 +581,7 @@
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
-            color: #555;
+            color: var(--text2);
         }
 
         .form-group input,
@@ -557,10 +589,12 @@
         .form-group textarea {
             width: 100%;
             padding: 12px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid var(--input-border);
             border-radius: 8px;
             font-size: 15px;
             font-family: 'Noto Sans TC', sans-serif;
+            background: var(--input-bg);
+            color: var(--text);
         }
 
         .form-group textarea {
@@ -711,6 +745,7 @@
                     <option value="baiwei">百位</option>
                 </select>
                 <button class="btn-add" onclick="showAddModal()">➕ 新增診所</button>
+                <button class="btn-delete-batch" onclick="showBatchEditModal()" id="btnBatchEdit" style="display: none; background: #4facfe;">📝 批次編輯</button>
                 <button class="btn-delete-batch" onclick="deleteSelected()" id="btnDeleteBatch" style="display: none;">🗑️ 刪除選中</button>
                 <button class="btn-export" onclick="exportData()">📥 匯出 Excel</button>
                 <button class="btn-import" onclick="showImportModal()">📤 匯入 Excel</button>
@@ -726,13 +761,13 @@
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="selectAll" class="checkbox-select" title="全選"></th>
-                        <th>編號</th>
-                        <th>縣市</th>
-                        <th>區域</th>
-                        <th>診所名稱</th>
-                        <th>科別</th>
-                        <th>電話</th>
-                        <th>聯絡人</th>
+                        <th class="sortable" data-sort="id">編號 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" data-sort="region">縣市 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" data-sort="district">區域 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" data-sort="name">診所名稱 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" data-sort="specialties">科別 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" data-sort="phone">電話 <span class="sort-icon">⇅</span></th>
+                        <th class="sortable" data-sort="contact_person">聯絡人 <span class="sort-icon">⇅</span></th>
                         <th>合作項目</th>
                         <th>操作</th>
                     </tr>
@@ -965,6 +1000,59 @@
         </div>
     </div>
 
+    <!-- 批次編輯 Modal -->
+    <div class="modal" id="batchEditModal" style="display:none;">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2>📝 批次編輯 <span id="batchEditCount"></span></h2>
+                <button class="close-btn" onclick="closeBatchEditModal()">&times;</button>
+            </div>
+            <p style="color:#666;font-size:13px;margin-bottom:16px;">只會修改有勾選的欄位，未勾選的欄位保持不變。</p>
+            <div class="form-group">
+                <label><input type="checkbox" id="batchToggleRegion"> 修改縣市</label>
+                <select id="batchRegion" class="filter-select" style="width:100%;margin-top:6px;" disabled>
+                    <option value="">請選擇縣市</option>
+                    <option value="台北市">台北市</option><option value="新北市">新北市</option>
+                    <option value="基隆市">基隆市</option><option value="桃園市">桃園市</option>
+                    <option value="新竹市">新竹市</option><option value="新竹縣">新竹縣</option>
+                    <option value="苗栗縣">苗栗縣</option><option value="台中市">台中市</option>
+                    <option value="彰化縣">彰化縣</option><option value="南投縣">南投縣</option>
+                    <option value="雲林縣">雲林縣</option><option value="嘉義市">嘉義市</option>
+                    <option value="嘉義縣">嘉義縣</option><option value="台南市">台南市</option>
+                    <option value="高雄市">高雄市</option><option value="屏東縣">屏東縣</option>
+                    <option value="宜蘭縣">宜蘭縣</option><option value="花蓮縣">花蓮縣</option>
+                    <option value="台東縣">台東縣</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="batchToggleSpecialty"> 修改科別</label>
+                <div class="checkbox-group" id="batchSpecialtyGroup" style="margin-top:6px;opacity:0.4;pointer-events:none;">
+                    <label><input type="checkbox" value="小兒科"> 小兒科</label>
+                    <label><input type="checkbox" value="家醫科"> 家醫科</label>
+                    <label><input type="checkbox" value="耳鼻喉科"> 耳鼻喉科</label>
+                    <label><input type="checkbox" value="內科"> 內科</label>
+                    <label><input type="checkbox" value="外科"> 外科</label>
+                    <label><input type="checkbox" value="皮膚科"> 皮膚科</label>
+                    <label><input type="checkbox" value="婦產科"> 婦產科</label>
+                    <label><input type="checkbox" value="復健/骨科"> 復健/骨科</label>
+                    <label><input type="checkbox" value="中醫"> 中醫</label>
+                    <label><input type="checkbox" value="內兒科"> 內兒科</label>
+                    <label><input type="checkbox" value="其他"> 其他</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="batchToggleColItems"> 修改合作項目</label>
+                <div class="checkbox-group" id="batchColGroup" style="margin-top:6px;opacity:0.4;pointer-events:none;">
+                    <label><input type="checkbox" id="batchColYaodai"> 藥袋</label>
+                    <label><input type="checkbox" id="batchColHaibao"> 海報/立牌</label>
+                    <label><input type="checkbox" id="batchColPaiyang"> 派樣</label>
+                    <label><input type="checkbox" id="batchColBaiwei"> 百位</label>
+                </div>
+            </div>
+            <button class="btn-submit" onclick="submitBatchEdit()">確認批次修改</button>
+        </div>
+    </div>
+
     <script>
         let currentEditId = null;
         let _searchTimer = null;
@@ -972,6 +1060,8 @@
         let _totalPages  = 1;         // 由 API 回傳的總頁數
         let _total       = 0;         // 由 API 回傳的總筆數
         const PAGE_SIZE  = 50;        // 每頁筆數（與 API per_page 同步）
+        let _sortBy  = '';            // 目前排序欄位
+        let _sortDir = 'asc';        // 目前排序方向
 
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
@@ -988,6 +1078,43 @@
                 _searchTimer = setTimeout(applyFilters, 300);
             });
             document.getElementById('clinicForm').addEventListener('submit', handleSubmit);
+
+            // 排序功能
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.addEventListener('click', function() {
+                    const col = this.dataset.sort;
+                    if (_sortBy === col) {
+                        _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        _sortBy = col;
+                        _sortDir = 'asc';
+                    }
+                    // 更新表頭樣式
+                    document.querySelectorAll('th.sortable').forEach(h => {
+                        h.classList.remove('asc', 'desc');
+                        h.querySelector('.sort-icon').textContent = '⇅';
+                    });
+                    this.classList.add(_sortDir);
+                    this.querySelector('.sort-icon').textContent = _sortDir === 'asc' ? '↑' : '↓';
+                    currentPage = 1;
+                    loadClinics();
+                });
+            });
+
+            // 批次編輯 toggle
+            document.getElementById('batchToggleRegion').addEventListener('change', function() {
+                document.getElementById('batchRegion').disabled = !this.checked;
+            });
+            document.getElementById('batchToggleSpecialty').addEventListener('change', function() {
+                const g = document.getElementById('batchSpecialtyGroup');
+                g.style.opacity = this.checked ? '1' : '0.4';
+                g.style.pointerEvents = this.checked ? 'auto' : 'none';
+            });
+            document.getElementById('batchToggleColItems').addEventListener('change', function() {
+                const g = document.getElementById('batchColGroup');
+                g.style.opacity = this.checked ? '1' : '0.4';
+                g.style.pointerEvents = this.checked ? 'auto' : 'none';
+            });
 
             // 全選功能
             document.addEventListener('change', function(e) {
@@ -1019,10 +1146,11 @@
 
         function updateDeleteButton() {
             const checkedBoxes = document.querySelectorAll('.clinic-checkbox:checked');
+            const show = checkedBoxes.length > 0 ? 'inline-block' : 'none';
             const deleteBtn = document.getElementById('btnDeleteBatch');
-            if (deleteBtn) {
-                deleteBtn.style.display = checkedBoxes.length > 0 ? 'inline-block' : 'none';
-            }
+            const editBtn = document.getElementById('btnBatchEdit');
+            if (deleteBtn) deleteBtn.style.display = show;
+            if (editBtn) editBtn.style.display = show;
         }
 
         async function deleteSelected() {
@@ -1072,6 +1200,8 @@
             if (filters.city)        params.append('city',        filters.city);
             if (filters.specialty)   params.append('specialty',   filters.specialty);
             if (filters.cooperation) params.append('cooperation', filters.cooperation);
+            if (_sortBy)             params.append('sort',        _sortBy);
+            if (_sortBy)             params.append('dir',         _sortDir);
             if (page)                params.append('page',        page);
             params.append('per_page', PAGE_SIZE);
             return params;
@@ -1162,9 +1292,16 @@
             }
         }
 
+        function highlightText(text, query) {
+            if (!query || !text) return text || '';
+            const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return text.replace(new RegExp('(' + escaped + ')', 'gi'), '<mark class="hl">$1</mark>');
+        }
+
         function renderClinics(clinics, total, page, totalPages) {
             const tbody = document.getElementById('clinicsTable');
             tbody.innerHTML = '';
+            const _q = document.getElementById('searchInput').value.trim();
 
             if (total === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">沒有符合條件的診所</td></tr>';
@@ -1196,10 +1333,10 @@
                     <td>${rowNum}</td>
                     <td>${clinic.region || ''}</td>
                     <td>${clinic.district || ''}</td>
-                    <td title="${clinic.name}">${clinic.name}</td>
+                    <td title="${clinic.name}">${highlightText(clinic.name, _q)}</td>
                     <td>${specialties}</td>
-                    <td>${clinic.phone || ''}</td>
-                    <td>${clinic.contact_person || ''}</td>
+                    <td>${highlightText(clinic.phone || '', _q)}</td>
+                    <td>${highlightText(clinic.contact_person || '', _q)}</td>
                     <td>${colItemsDisplay}</td>
                     <td>
                         <button class="btn-edit" onclick="editClinic(${clinic.id})">編輯</button>
@@ -1867,6 +2004,75 @@
             }
 
             content.innerHTML = html;
+        }
+
+        // ── 批次編輯 ─────────────────────────────────────────────
+
+        function showBatchEditModal() {
+            const checked = document.querySelectorAll('.clinic-checkbox:checked');
+            if (checked.length === 0) { alert('請先選擇診所'); return; }
+            document.getElementById('batchEditCount').textContent = '（' + checked.length + ' 筆）';
+            // 重設表單
+            document.getElementById('batchToggleRegion').checked = false;
+            document.getElementById('batchRegion').disabled = true;
+            document.getElementById('batchRegion').value = '';
+            document.getElementById('batchToggleSpecialty').checked = false;
+            var sg = document.getElementById('batchSpecialtyGroup');
+            sg.style.opacity = '0.4'; sg.style.pointerEvents = 'none';
+            sg.querySelectorAll('input').forEach(function(cb) { cb.checked = false; });
+            document.getElementById('batchToggleColItems').checked = false;
+            var cg = document.getElementById('batchColGroup');
+            cg.style.opacity = '0.4'; cg.style.pointerEvents = 'none';
+            cg.querySelectorAll('input').forEach(function(cb) { cb.checked = false; });
+            document.getElementById('batchEditModal').style.display = 'block';
+        }
+
+        function closeBatchEditModal() {
+            document.getElementById('batchEditModal').style.display = 'none';
+        }
+
+        async function submitBatchEdit() {
+            var ids = Array.from(document.querySelectorAll('.clinic-checkbox:checked'))
+                .map(function(cb) { return parseInt(cb.getAttribute('data-clinic-id')); });
+            if (ids.length === 0) { alert('未選擇診所'); return; }
+
+            var fields = {};
+            if (document.getElementById('batchToggleRegion').checked) {
+                fields.region = document.getElementById('batchRegion').value;
+            }
+            if (document.getElementById('batchToggleSpecialty').checked) {
+                var specs = Array.from(document.querySelectorAll('#batchSpecialtyGroup input:checked'))
+                    .map(function(cb) { return cb.value; });
+                fields.specialties = specs.join(',');
+            }
+            if (document.getElementById('batchToggleColItems').checked) {
+                fields.col_yaodai  = document.getElementById('batchColYaodai').checked;
+                fields.col_haibao  = document.getElementById('batchColHaibao').checked;
+                fields.col_paiyang = document.getElementById('batchColPaiyang').checked;
+                fields.col_baiwei  = document.getElementById('batchColBaiwei').checked;
+            }
+
+            if (Object.keys(fields).length === 0) { alert('請至少勾選一個要修改的欄位'); return; }
+            if (!confirm('確定要批次修改 ' + ids.length + ' 筆診所？')) return;
+
+            try {
+                var res = await fetch('/api/clinics/batch-edit', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ids, fields: fields })
+                });
+                var data = await res.json();
+                if (data.success) {
+                    alert('成功修改 ' + data.updated + ' 筆');
+                    closeBatchEditModal();
+                    loadClinics();
+                    loadStats();
+                } else {
+                    alert(data.error || '修改失敗');
+                }
+            } catch(e) {
+                alert('批次修改失敗：' + e.message);
+            }
         }
 
         async function deleteDuplicateClinic(id) {

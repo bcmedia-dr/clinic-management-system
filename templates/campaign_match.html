@@ -5,9 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>活動比對 - Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
+        body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); }
+
+        :root {
+            --bg: #f5f7fa; --text: #333; --card: white; --border: #e5e5e5;
+            --muted: #888; --hover: #fafafa;
+        }
 
         /* ── Header ── */
         .header {
@@ -41,11 +47,11 @@
 
         /* ── Upload card ── */
         .upload-card {
-            background: white; border-radius: 15px;
+            background: var(--card); border-radius: 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 30px;
             margin-bottom: 28px;
         }
-        .upload-card h2 { font-size: 18px; color: #333; margin-bottom: 20px; }
+        .upload-card h2 { font-size: 18px; color: var(--text); margin-bottom: 20px; }
         .upload-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
         .form-field { display: flex; flex-direction: column; gap: 6px; }
         .form-field label { font-size: 13px; font-weight: 600; color: #555; }
@@ -68,13 +74,41 @@
         .btn-match:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
         .hint {
-            margin-top: 14px; font-size: 12px; color: #888;
+            margin-top: 14px; font-size: 12px; color: var(--muted);
             background: #f8f9fa; padding: 10px 14px; border-radius: 8px;
         }
 
-        /* ── Summary bars ── */
+        /* ── History panel ── */
+        .history-card {
+            background: var(--card); border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 20px;
+            margin-bottom: 28px;
+        }
+        .history-card h3 { font-size: 15px; color: var(--text); margin-bottom: 12px; }
+        .history-list { max-height: 200px; overflow-y: auto; }
+        .history-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-radius: 8px; cursor: pointer;
+            transition: background 0.2s; font-size: 13px; border-bottom: 1px solid #f0f0f0;
+        }
+        .history-item:hover { background: #f8f0ff; }
+        .history-item.active { background: #f0e6ff; border-left: 3px solid #fa709a; }
+        .history-meta { color: #999; font-size: 12px; }
+        .history-counts { display: flex; gap: 8px; font-size: 11px; }
+        .history-counts span { padding: 2px 6px; border-radius: 8px; }
+        .hc-green { background: #d4edda; color: #155724; }
+        .hc-red { background: #f8d7da; color: #721c24; }
+        .hc-yellow { background: #fff3cd; color: #856404; }
+        .btn-del-history {
+            background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px;
+            padding: 0 4px; transition: color 0.2s;
+        }
+        .btn-del-history:hover { color: #e74c3c; }
+        .history-empty { color: #bbb; text-align: center; padding: 20px; font-size: 13px; }
+
+        /* ── Summary + pie chart ── */
         .summary-row {
-            display: grid; grid-template-columns: repeat(3, 1fr);
+            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
             gap: 16px; margin-bottom: 24px; display: none;
         }
         .summary-card {
@@ -84,6 +118,7 @@
         .summary-card.green { background: #d4edda; border-left: 5px solid #28a745; }
         .summary-card.red   { background: #f8d7da; border-left: 5px solid #dc3545; }
         .summary-card.yellow{ background: #fff3cd; border-left: 5px solid #ffc107; }
+        .summary-card.chart-card { background: var(--card); border-left: 5px solid #764ba2; padding: 12px; }
         .summary-num  { font-size: 36px; font-weight: 700; }
         .summary-label{ font-size: 14px; font-weight: 600; margin-top: 4px; }
         .summary-card.green  .summary-num  { color: #155724; }
@@ -105,12 +140,11 @@
         .block-toggle.open { transform: rotate(180deg); }
 
         .block-body {
-            background: white; border: 1px solid #e5e5e5; border-top: none;
+            background: var(--card); border: 1px solid var(--border); border-top: none;
             border-radius: 0 0 12px 12px; overflow: hidden;
         }
         .block-body.hidden { display: none; }
 
-        /* filters inside red block */
         .block-filters {
             display: flex; gap: 12px; padding: 14px 16px; background: #fff5f5;
             border-bottom: 1px solid #f0d0d0; flex-wrap: wrap; align-items: center;
@@ -126,18 +160,17 @@
         }
         .btn-export-block:hover { background: #b02a37; }
 
-        /* table */
         .result-table { width: 100%; border-collapse: collapse; }
         .result-table th {
             padding: 11px 12px; text-align: left; font-size: 13px;
             font-weight: 600; color: #555; background: #f8f9fa;
-            border-bottom: 2px solid #e5e5e5; white-space: nowrap;
+            border-bottom: 2px solid var(--border); white-space: nowrap;
         }
         .result-table td {
             padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f0f0f0;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
         }
-        .result-table tbody tr:hover { background: #fafafa; }
+        .result-table tbody tr:hover { background: var(--hover); }
         .result-table td.specialty { white-space: normal; max-width: 160px; }
         .specialty-tag {
             display: inline-block; background: #e3f2fd; color: #1976d2;
@@ -146,11 +179,11 @@
         .empty-row td { text-align: center; color: #aaa; padding: 24px; }
 
         .loading-bar {
-            display: none; text-align: center; padding: 30px; color: #888; font-size: 15px;
+            display: none; text-align: center; padding: 30px; color: var(--muted); font-size: 15px;
         }
 
         @media (max-width: 700px) {
-            .summary-row { grid-template-columns: 1fr; }
+            .summary-row { grid-template-columns: 1fr 1fr; }
             .upload-row { flex-direction: column; }
         }
     </style>
@@ -196,9 +229,17 @@
         </div>
     </div>
 
+    <!-- 比對歷史 -->
+    <div class="history-card">
+        <h3>📜 比對歷史記錄</h3>
+        <div class="history-list" id="historyList">
+            <div class="history-empty">載入中...</div>
+        </div>
+    </div>
+
     <div class="loading-bar" id="loadingBar">⏳ 比對中，請稍候...</div>
 
-    <!-- 摘要 -->
+    <!-- 摘要 + 圓餅圖 -->
     <div class="summary-row" id="summaryRow">
         <div class="summary-card green">
             <div class="summary-num" id="numMatched">0</div>
@@ -206,11 +247,14 @@
         </div>
         <div class="summary-card red">
             <div class="summary-num" id="numNotJoined">0</div>
-            <div class="summary-label">❌ 未參加（主要追蹤名單）</div>
+            <div class="summary-label">❌ 未參加</div>
         </div>
         <div class="summary-card yellow">
             <div class="summary-num" id="numNotInSystem">0</div>
             <div class="summary-label">⚠️ 系統未建立</div>
+        </div>
+        <div class="summary-card chart-card">
+            <canvas id="chartPie" style="max-height:120px;"></canvas>
         </div>
     </div>
 
@@ -286,56 +330,154 @@
 </div>
 
 <script>
-    let _notJoined = [];    // 完整未參加清單（從 server 回傳）
+    let _notJoined = [];
+    let _pieChart = null;
+
+    // 載入歷史記錄
+    async function loadHistory() {
+        try {
+            var res = await fetch('/api/campaign/match-history');
+            var data = await res.json();
+            var list = document.getElementById('historyList');
+            if (data.length === 0) {
+                list.innerHTML = '<div class="history-empty">尚無比對記錄</div>';
+                return;
+            }
+            list.innerHTML = data.map(function(h) {
+                return '<div class="history-item" onclick="loadHistoryResult(' + h.id + ')">' +
+                    '<div>' +
+                        '<strong>' + (h.campaign_name || '未命名') + '</strong>' +
+                        '<div class="history-meta">' + h.created_at + '</div>' +
+                    '</div>' +
+                    '<div style="display:flex;align-items:center;gap:8px;">' +
+                        '<div class="history-counts">' +
+                            '<span class="hc-green">' + h.matched_count + '</span>' +
+                            '<span class="hc-red">' + h.not_joined_count + '</span>' +
+                            '<span class="hc-yellow">' + h.not_in_system_count + '</span>' +
+                        '</div>' +
+                        '<button class="btn-del-history" onclick="event.stopPropagation();deleteHistory(' + h.id + ')" title="刪除">×</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        } catch(e) {
+            document.getElementById('historyList').innerHTML = '<div class="history-empty">載入失敗</div>';
+        }
+    }
+
+    async function loadHistoryResult(id) {
+        try {
+            var res = await fetch('/api/campaign/match-history/' + id);
+            var data = await res.json();
+            displayResult(data);
+            // 高亮選中項
+            document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
+            // 找到對應項
+            document.querySelectorAll('.history-item').forEach(function(el) {
+                if (el.onclick && el.onclick.toString().indexOf(id) >= 0) el.classList.add('active');
+            });
+        } catch(e) {
+            alert('載入歷史記錄失敗：' + e.message);
+        }
+    }
+
+    async function deleteHistory(id) {
+        if (!confirm('確定刪除此比對記錄？')) return;
+        try {
+            await fetch('/api/campaign/match-history/' + id, { method: 'DELETE' });
+            loadHistory();
+        } catch(e) { alert('刪除失敗'); }
+    }
+
+    function displayResult(data) {
+        _notJoined = data.not_joined || [];
+
+        // 摘要數字
+        var m = (data.matched || []).length;
+        var nj = (data.not_joined || []).length;
+        var nis = (data.not_in_system || []).length;
+        document.getElementById('numMatched').textContent = m;
+        document.getElementById('numNotJoined').textContent = nj;
+        document.getElementById('numNotInSystem').textContent = nis;
+        document.getElementById('summaryRow').style.display = 'grid';
+
+        // 圓餅圖
+        renderPieChart(m, nj, nis);
+
+        // 填入縣市篩選
+        var regions = [];
+        var seen = {};
+        _notJoined.forEach(function(c) {
+            if (c.region && !seen[c.region]) { regions.push(c.region); seen[c.region] = true; }
+        });
+        regions.sort();
+        var rSel = document.getElementById('filterNJRegion');
+        rSel.innerHTML = '<option value="">全部縣市</option>';
+        regions.forEach(function(r) {
+            var opt = document.createElement('option');
+            opt.value = r; opt.textContent = r;
+            rSel.appendChild(opt);
+        });
+
+        renderSimpleTable('tableMatched', data.matched || [], ['region','district','name','specialties','phone','contact_person']);
+        showBlock('blockMatched');
+        renderNotJoined();
+        showBlock('blockNotJoined');
+        renderNotInSystem(data.not_in_system || []);
+        showBlock('blockNotInSystem');
+    }
+
+    function renderPieChart(matched, notJoined, notInSystem) {
+        var ctx = document.getElementById('chartPie');
+        if (_pieChart) { _pieChart.destroy(); }
+        _pieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['已參加', '未參加', '未建檔'],
+                datasets: [{
+                    data: [matched, notJoined, notInSystem],
+                    backgroundColor: ['#28a745cc', '#dc3545cc', '#ffc107cc'],
+                    borderColor: ['#28a745', '#dc3545', '#ffc107'],
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                var total = ctx.dataset.data.reduce(function(a,b){ return a+b; }, 0);
+                                var pct = total > 0 ? Math.round(ctx.parsed / total * 100) : 0;
+                                return ' ' + ctx.label + '：' + ctx.parsed + ' (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 
     async function runMatch() {
-        const file = document.getElementById('uploadFile').files[0];
+        var file = document.getElementById('uploadFile').files[0];
         if (!file) { alert('請先選擇 Excel 檔案'); return; }
 
-        const btn = document.getElementById('btnMatch');
+        var btn = document.getElementById('btnMatch');
         btn.disabled = true;
         document.getElementById('loadingBar').style.display = 'block';
         hideSummaryAndBlocks();
 
-        const formData = new FormData();
+        var formData = new FormData();
         formData.append('file', file);
+        formData.append('campaign_name', document.getElementById('campaignName').value.trim() || file.name);
 
         try {
-            const res = await fetch('/api/campaign/match', { method: 'POST', body: formData });
-            const data = await res.json();
-
+            var res = await fetch('/api/campaign/match', { method: 'POST', body: formData });
+            var data = await res.json();
             if (!res.ok) { alert(data.error || '比對失敗'); return; }
 
-            _notJoined = data.not_joined;
-
-            // 摘要數字
-            document.getElementById('numMatched').textContent    = data.matched.length;
-            document.getElementById('numNotJoined').textContent  = data.not_joined.length;
-            document.getElementById('numNotInSystem').textContent = data.not_in_system.length;
-            document.getElementById('summaryRow').style.display  = 'grid';
-
-            // 填入縣市篩選選項（從 not_joined 收集）
-            const regions = [...new Set(data.not_joined.map(c => c.region).filter(Boolean))].sort();
-            const rSel = document.getElementById('filterNJRegion');
-            rSel.innerHTML = '<option value="">全部縣市</option>';
-            regions.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r; opt.textContent = r;
-                rSel.appendChild(opt);
-            });
-
-            // 已參加
-            renderSimpleTable('tableMatched', data.matched, ['region','district','name','specialties','phone','contact_person']);
-            showBlock('blockMatched');
-
-            // 未參加（含篩選）
-            renderNotJoined();
-            showBlock('blockNotJoined');
-
-            // 系統未建立
-            renderNotInSystem(data.not_in_system);
-            showBlock('blockNotInSystem');
-
+            displayResult(data);
+            loadHistory(); // 重新載入歷史
         } catch (err) {
             console.error(err);
             alert('比對時發生錯誤：' + err.message);
@@ -346,125 +488,115 @@
     }
 
     function renderNotJoined() {
-        const regionFilter    = document.getElementById('filterNJRegion').value;
-        const specialtyFilter = document.getElementById('filterNJSpecialty').value;
-
-        const filtered = _notJoined.filter(c => {
+        var regionFilter    = document.getElementById('filterNJRegion').value;
+        var specialtyFilter = document.getElementById('filterNJSpecialty').value;
+        var filtered = _notJoined.filter(function(c) {
             if (regionFilter && c.region !== regionFilter) return false;
             if (specialtyFilter && !(c.specialties || '').includes(specialtyFilter)) return false;
             return true;
         });
 
-        const tbody = document.getElementById('tableNotJoined');
+        var tbody = document.getElementById('tableNotJoined');
         tbody.innerHTML = '';
-
         if (filtered.length === 0) {
             tbody.innerHTML = '<tr class="empty-row"><td colspan="8">沒有符合條件的診所</td></tr>';
             return;
         }
-
-        filtered.forEach((c, i) => {
-            const specTags = (c.specialties || '').split(',').filter(Boolean)
-                .map(s => `<span class="specialty-tag">${s.trim()}</span>`).join('');
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${i + 1}</td>
-                <td>${c.region}</td>
-                <td>${c.district}</td>
-                <td><strong>${c.name}</strong></td>
-                <td class="specialty">${specTags || '-'}</td>
-                <td title="${c.address}">${c.address || '-'}</td>
-                <td>${c.phone}</td>
-                <td>${c.contact_person}</td>
-            `;
+        filtered.forEach(function(c, i) {
+            var specTags = (c.specialties || '').split(',').filter(Boolean)
+                .map(function(s) { return '<span class="specialty-tag">' + s.trim() + '</span>'; }).join('');
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + (i + 1) + '</td>' +
+                '<td>' + (c.region || '') + '</td>' +
+                '<td>' + (c.district || '') + '</td>' +
+                '<td><strong>' + (c.name || '') + '</strong></td>' +
+                '<td class="specialty">' + (specTags || '-') + '</td>' +
+                '<td title="' + (c.address || '') + '">' + (c.address || '-') + '</td>' +
+                '<td>' + (c.phone || '') + '</td>' +
+                '<td>' + (c.contact_person || '') + '</td>';
             tbody.appendChild(tr);
         });
     }
 
     function renderSimpleTable(tbodyId, rows, keys) {
-        const tbody = document.getElementById(tbodyId);
+        var tbody = document.getElementById(tbodyId);
         tbody.innerHTML = '';
         if (rows.length === 0) {
-            tbody.innerHTML = `<tr class="empty-row"><td colspan="${keys.length + 1}">無資料</td></tr>`;
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="' + (keys.length + 1) + '">無資料</td></tr>';
             return;
         }
-        rows.forEach((c, i) => {
-            const tr = document.createElement('tr');
-            const cells = keys.map(k => {
+        rows.forEach(function(c, i) {
+            var tr = document.createElement('tr');
+            var cells = keys.map(function(k) {
                 if (k === 'specialties') {
-                    const tags = (c[k] || '').split(',').filter(Boolean)
-                        .map(s => `<span class="specialty-tag">${s.trim()}</span>`).join('');
-                    return `<td class="specialty">${tags || '-'}</td>`;
+                    var tags = (c[k] || '').split(',').filter(Boolean)
+                        .map(function(s) { return '<span class="specialty-tag">' + s.trim() + '</span>'; }).join('');
+                    return '<td class="specialty">' + (tags || '-') + '</td>';
                 }
-                return `<td>${c[k] || ''}</td>`;
+                return '<td>' + (c[k] || '') + '</td>';
             }).join('');
-            tr.innerHTML = `<td>${i + 1}</td>${cells}`;
+            tr.innerHTML = '<td>' + (i + 1) + '</td>' + cells;
             tbody.appendChild(tr);
         });
     }
 
     function renderNotInSystem(rows) {
-        const tbody = document.getElementById('tableNotInSystem');
+        var tbody = document.getElementById('tableNotInSystem');
         tbody.innerHTML = '';
         if (rows.length === 0) {
             tbody.innerHTML = '<tr class="empty-row"><td colspan="5">無資料</td></tr>';
             return;
         }
-        rows.forEach((c, i) => {
-            tbody.innerHTML += `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td>${c.region || ''}</td>
-                    <td>${c.district || ''}</td>
-                    <td><strong>${c.name || ''}</strong></td>
-                    <td>${c.phone || ''}</td>
-                </tr>`;
+        rows.forEach(function(c, i) {
+            tbody.innerHTML +=
+                '<tr><td>' + (i + 1) + '</td>' +
+                '<td>' + (c.region || '') + '</td>' +
+                '<td>' + (c.district || '') + '</td>' +
+                '<td><strong>' + (c.name || '') + '</strong></td>' +
+                '<td>' + (c.phone || '') + '</td></tr>';
         });
     }
 
     function exportNotJoined() {
-        const regionFilter    = document.getElementById('filterNJRegion').value;
-        const specialtyFilter = document.getElementById('filterNJSpecialty').value;
-        const campaign = document.getElementById('campaignName').value.trim() || '活動';
-
-        const filtered = _notJoined.filter(c => {
+        var regionFilter    = document.getElementById('filterNJRegion').value;
+        var specialtyFilter = document.getElementById('filterNJSpecialty').value;
+        var campaign = document.getElementById('campaignName').value.trim() || '活動';
+        var filtered = _notJoined.filter(function(c) {
             if (regionFilter && c.region !== regionFilter) return false;
             if (specialtyFilter && !(c.specialties || '').includes(specialtyFilter)) return false;
             return true;
         });
-
         if (filtered.length === 0) { alert('目前篩選結果為空，無法匯出'); return; }
-
-        const ids = filtered.map(c => c.id).join(',');
-        const params = new URLSearchParams({ ids, campaign });
-        window.location.href = `/api/campaign/export-not-joined?${params}`;
+        var ids = filtered.map(function(c) { return c.id; }).join(',');
+        var params = new URLSearchParams({ ids: ids, campaign: campaign });
+        window.location.href = '/api/campaign/export-not-joined?' + params;
     }
 
     function toggleBlock(name) {
-        const bodyMap = { matched: 'bodyMatched', notJoined: 'bodyNotJoined', notInSystem: 'bodyNotInSystem' };
-        const toggleMap = { matched: 'toggleMatched', notJoined: 'toggleNotJoined', notInSystem: 'toggleNotInSystem' };
-        const body   = document.getElementById(bodyMap[name]);
-        const toggle = document.getElementById(toggleMap[name]);
-        body.classList.toggle('hidden');
-        toggle.classList.toggle('open');
+        var bodyMap = { matched: 'bodyMatched', notJoined: 'bodyNotJoined', notInSystem: 'bodyNotInSystem' };
+        var toggleMap = { matched: 'toggleMatched', notJoined: 'toggleNotJoined', notInSystem: 'toggleNotInSystem' };
+        document.getElementById(bodyMap[name]).classList.toggle('hidden');
+        document.getElementById(toggleMap[name]).classList.toggle('open');
     }
 
-    function showBlock(id) {
-        document.getElementById(id).classList.add('visible');
-    }
+    function showBlock(id) { document.getElementById(id).classList.add('visible'); }
 
     function hideSummaryAndBlocks() {
         document.getElementById('summaryRow').style.display = 'none';
-        ['blockMatched', 'blockNotJoined', 'blockNotInSystem'].forEach(id => {
+        ['blockMatched', 'blockNotJoined', 'blockNotInSystem'].forEach(function(id) {
             document.getElementById(id).classList.remove('visible');
         });
-        ['bodyMatched', 'bodyNotJoined', 'bodyNotInSystem'].forEach(id => {
+        ['bodyMatched', 'bodyNotJoined', 'bodyNotInSystem'].forEach(function(id) {
             document.getElementById(id).classList.remove('hidden');
         });
-        ['toggleMatched', 'toggleNotJoined', 'toggleNotInSystem'].forEach(id => {
+        ['toggleMatched', 'toggleNotJoined', 'toggleNotInSystem'].forEach(function(id) {
             document.getElementById(id).classList.add('open');
         });
     }
+
+    // 頁面載入時載入歷史
+    loadHistory();
 </script>
 </body>
 </html>

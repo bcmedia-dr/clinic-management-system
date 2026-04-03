@@ -7,9 +7,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <style>
+        :root {
+            --bg: #f5f7fa; --card: #fff; --text: #333; --text2: #555;
+            --border: #f0f0f0; --muted: #999; --shadow: rgba(0,0,0,0.05);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a2e; --card: #16213e; --text: #e0e0e0; --text2: #aaa;
+                --border: #2a2a4a; --muted: #777; --shadow: rgba(0,0,0,0.2);
+            }
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Noto Sans TC', sans-serif; background: #f5f7fa; color: #333; }
+        body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); }
 
         /* ── Header ── */
         .header {
@@ -51,8 +63,8 @@
             margin-bottom: 30px;
         }
         .stat-card {
-            background: white; padding: 24px 20px;
-            border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            background: var(--card); padding: 24px 20px;
+            border-radius: 15px; box-shadow: 0 2px 10px var(--shadow);
             transition: transform 0.2s, box-shadow 0.2s;
         }
         .stat-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
@@ -75,13 +87,13 @@
         .chart-full { grid-column: 1 / -1; }
 
         .chart-card {
-            background: white; border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 24px;
+            background: var(--card); border-radius: 15px;
+            box-shadow: 0 2px 10px var(--shadow); padding: 24px;
         }
         .chart-title {
-            font-size: 16px; font-weight: 700; color: #333;
+            font-size: 16px; font-weight: 700; color: var(--text);
             margin-bottom: 20px; padding-bottom: 12px;
-            border-bottom: 2px solid #f0f0f0;
+            border-bottom: 2px solid var(--border);
             display: flex; align-items: center; gap: 8px;
         }
         .chart-title .dot {
@@ -123,6 +135,7 @@
                 <h1>統計分析</h1>
             </div>
             <div class="header-right">
+                <button class="btn-logout" onclick="exportPDF()" id="btnPdf">📄 匯出 PDF</button>
                 <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
             </div>
         </div>
@@ -488,6 +501,35 @@
                 return l === status ? allColors[i] : dimColors[i];
             });
             _chartHmStatus.update();
+        }
+
+        async function exportPDF() {
+            var btn = document.getElementById('btnPdf');
+            btn.disabled = true;
+            btn.textContent = '匯出中...';
+            try {
+                var container = document.querySelector('.container');
+                var canvas = await html2canvas(container, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#f5f7fa',
+                });
+                var imgData = canvas.toDataURL('image/png');
+                var pdf = new jspdf.jsPDF({
+                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height],
+                });
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                var today = new Date().toISOString().slice(0, 10);
+                pdf.save('統計分析報表_' + today + '.pdf');
+            } catch (e) {
+                console.error('PDF 匯出失敗:', e);
+                alert('PDF 匯出失敗：' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📄 匯出 PDF';
+            }
         }
 
         loadAndRender();
