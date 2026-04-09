@@ -1673,12 +1673,18 @@ def get_clinic_campaigns(clinic_id):
     result = []
     for link in links:
         c = link.campaign
+        if c.year and c.month:
+            campaign_date = f'{c.year}年{c.month}月'
+        elif c.year:
+            campaign_date = f'{c.year}年'
+        else:
+            campaign_date = ''
         result.append({
             'campaign_id':   c.id,
             'campaign_name': c.name,
             'brand':         c.brand or '',
             'year':          c.year,
-            'joined_at':     link.joined_at.strftime('%Y-%m-%d') if link.joined_at else '',
+            'campaign_date': campaign_date,
         })
     return jsonify(result)
 

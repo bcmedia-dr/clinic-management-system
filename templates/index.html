@@ -1427,13 +1427,13 @@
                                 <thead><tr style="background:#f5f7fa;">
                                     <th style="padding:5px 14px;font-size:12px;text-align:left;color:#555;">活動名稱</th>
                                     <th style="padding:5px 14px;font-size:12px;text-align:left;color:#555;">年份</th>
-                                    <th style="padding:5px 14px;font-size:12px;text-align:left;color:#555;">參加日期</th>
+                                    <th style="padding:5px 14px;font-size:12px;text-align:left;color:#555;">活動日期</th>
                                 </tr></thead>
                                 <tbody>${campaigns.map(c => `
                                     <tr>
                                         <td style="padding:5px 14px;font-size:13px;">${c.campaign_name}</td>
                                         <td style="padding:5px 14px;font-size:13px;">${c.year || '-'}</td>
-                                        <td style="padding:5px 14px;font-size:13px;">${c.joined_at}</td>
+                                        <td style="padding:5px 14px;font-size:13px;">${c.campaign_date || '-'}</td>
                                     </tr>`).join('')}
                                 </tbody>
                             </table>`;
