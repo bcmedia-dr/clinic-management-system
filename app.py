@@ -120,6 +120,26 @@ class BaiweiDoctor(db.Model):
     clinic = db.relationship('Clinic', backref=db.backref('baiwei_doctors', lazy=True))
 
 
+class BaiweiCampaign(db.Model):
+    __tablename__ = 'baiwei_campaign'
+    id         = db.Column(db.Integer, primary_key=True)
+    name       = db.Column(db.String(200), nullable=False)
+    year       = db.Column(db.Integer)
+    note       = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class BaiweiParticipation(db.Model):
+    __tablename__ = 'baiwei_participation'
+    id          = db.Column(db.Integer, primary_key=True)
+    doctor_id   = db.Column(db.Integer, db.ForeignKey('baiwei_doctor.id', ondelete='CASCADE'), nullable=False)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('baiwei_campaign.id', ondelete='CASCADE'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('doctor_id', 'campaign_id', name='uq_baiwei_participation'),)
+
+    doctor   = db.relationship('BaiweiDoctor',   backref=db.backref('participations', lazy=True))
+    campaign = db.relationship('BaiweiCampaign', backref=db.backref('participations', lazy=True))
+
+
 class MatchHistory(db.Model):
     """活動比對歷史：儲存每次比對的結果摘要"""
     __tablename__ = 'match_history'
@@ -1957,6 +1977,126 @@ def export_baiwei():
                      as_attachment=True, download_name=filename)
 
 
+# ── 百位活動 API ──────────────────────────────────────────────
+
+@app.route('/api/baiwei-campaigns', methods=['GET'])
+def get_baiwei_campaigns():
+    campaigns = BaiweiCampaign.query.order_by(BaiweiCampaign.year.desc(), BaiweiCampaign.id.desc()).all()
+    return jsonify([{
+        'id':    c.id,
+        'name':  c.name,
+        'year':  c.year,
+        'note':  c.note or '',
+        'count': BaiweiParticipation.query.filter_by(campaign_id=c.id).count(),
+    } for c in campaigns])
+
+
+@app.route('/api/baiwei-campaigns', methods=['POST'])
+def create_baiwei_campaign():
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': '活動名稱不可空白'}), 400
+    c = BaiweiCampaign(name=name, year=data.get('year') or None, note=data.get('note') or None)
+    db.session.add(c)
+    db.session.commit()
+    return jsonify({'id': c.id, 'name': c.name, 'year': c.year, 'note': c.note or '', 'count': 0})
+
+
+@app.route('/api/baiwei-campaigns/<int:campaign_id>', methods=['DELETE'])
+def delete_baiwei_campaign(campaign_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    c = BaiweiCampaign.query.get_or_404(campaign_id)
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/baiwei-campaigns/<int:campaign_id>/doctors', methods=['GET'])
+def get_baiwei_campaign_doctors(campaign_id):
+    BaiweiCampaign.query.get_or_404(campaign_id)
+    specialty = request.args.get('specialty', '')
+    q = (db.session.query(BaiweiParticipation, BaiweiDoctor)
+         .join(BaiweiDoctor, BaiweiParticipation.doctor_id == BaiweiDoctor.id)
+         .filter(BaiweiParticipation.campaign_id == campaign_id))
+    if specialty:
+        q = q.filter(BaiweiDoctor.specialty.like(f'%{specialty}%'))
+    rows = q.order_by(BaiweiDoctor.region, BaiweiDoctor.clinic_name).all()
+    return jsonify([{
+        'participation_id': p.id,
+        'id':          d.id,
+        'doctor_name': d.doctor_name or '',
+        'clinic_name': d.clinic_name or '',
+        'region':      d.region or '',
+        'district':    d.district or '',
+        'specialty':   d.specialty or '',
+        'phone':       d.phone or '',
+    } for p, d in rows])
+
+
+@app.route('/api/baiwei-campaigns/<int:campaign_id>/doctors', methods=['POST'])
+def add_baiwei_campaign_doctors(campaign_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    BaiweiCampaign.query.get_or_404(campaign_id)
+    data = request.get_json() or {}
+    doctor_ids = data.get('doctor_ids', [])
+    if not doctor_ids:
+        return jsonify({'error': '未指定醫師'}), 400
+    added = 0
+    for did in doctor_ids:
+        if not BaiweiParticipation.query.filter_by(doctor_id=did, campaign_id=campaign_id).first():
+            db.session.add(BaiweiParticipation(doctor_id=did, campaign_id=campaign_id))
+            added += 1
+    db.session.commit()
+    return jsonify({'success': True, 'added': added})
+
+
+@app.route('/api/baiwei-campaigns/<int:campaign_id>/doctors/<int:doctor_id>', methods=['DELETE'])
+def remove_baiwei_campaign_doctor(campaign_id, doctor_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    p = BaiweiParticipation.query.filter_by(campaign_id=campaign_id, doctor_id=doctor_id).first_or_404()
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/baiwei-campaigns/<int:campaign_id>/export', methods=['GET'])
+def export_baiwei_campaign(campaign_id):
+    campaign = BaiweiCampaign.query.get_or_404(campaign_id)
+    rows = (db.session.query(BaiweiParticipation, BaiweiDoctor)
+            .join(BaiweiDoctor, BaiweiParticipation.doctor_id == BaiweiDoctor.id)
+            .filter(BaiweiParticipation.campaign_id == campaign_id)
+            .order_by(BaiweiDoctor.region, BaiweiDoctor.clinic_name).all())
+    wb = Workbook()
+    ws = wb.active
+    ws.title = campaign.name[:28]
+    headers = ['縣市', '區域', '診所名稱', '醫師名字', '科別', '電話']
+    ws.append(headers)
+    fill = PatternFill(start_color='667EEA', end_color='667EEA', fill_type='solid')
+    for i in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=i)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = fill
+        cell.alignment = Alignment(horizontal='center')
+    for p, d in rows:
+        ws.append([d.region or '', d.district or '', d.clinic_name or '',
+                   d.doctor_name or '', d.specialty or '', d.phone or ''])
+    for i, w in enumerate([10, 10, 22, 12, 15, 15], 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    filename = f'{campaign.name}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    return send_file(output,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+
 # ── 工具函式 ─────────────────────────────────────────────────
 
 def _normalize_phone(phone):
@@ -2035,6 +2175,21 @@ with app.app_context():
         'CREATE INDEX IF NOT EXISTS idx_campaign_clinic_clinic_id ON campaign_clinic(clinic_id)',
         # 移除廢棄欄位（已被 col_yaodai/col_haibao/col_paiyang/col_baiwei 取代）
         'ALTER TABLE clinic DROP COLUMN IF EXISTS media_items',
+        # 百位活動表
+        """CREATE TABLE IF NOT EXISTS baiwei_campaign (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            year INTEGER,
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        # 百位活動參加記錄（多對多）
+        """CREATE TABLE IF NOT EXISTS baiwei_participation (
+            id SERIAL PRIMARY KEY,
+            doctor_id INTEGER NOT NULL REFERENCES baiwei_doctor(id) ON DELETE CASCADE,
+            campaign_id INTEGER NOT NULL REFERENCES baiwei_campaign(id) ON DELETE CASCADE,
+            CONSTRAINT uq_baiwei_participation UNIQUE (doctor_id, campaign_id)
+        )""",
         # 比對歷史記錄表
         """CREATE TABLE IF NOT EXISTS match_history (
             id SERIAL PRIMARY KEY,
