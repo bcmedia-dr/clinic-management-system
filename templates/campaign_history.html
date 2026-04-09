@@ -627,8 +627,7 @@
                     return `
                     <div class="campaign-item${c.id === currentCampaignId ? ' selected' : ''}"
                          id="campaign-item-${c.id}" onclick="selectCampaign(${c.id})">
-                        <div class="campaign-item-name">${c.name}</div>
-                        <div class="campaign-item-meta">${c.brand || ''}${c.brand && (c.year || c.month) ? '　' : ''}${fmtPeriod(c.year, c.month) !== '-' ? fmtPeriod(c.year, c.month) : ''}</div>
+                        <div class="campaign-item-name">${fmtPeriod(c.year, c.month) !== '-' ? fmtPeriod(c.year, c.month) + '「' + (c.brand || c.name) + '」' : (c.brand || c.name)}</div>
                         <div class="campaign-item-count">📍 ${c.clinic_count} 間診所</div>
                         ${coopHtml ? `<div class="campaign-item-coop">${coopHtml}</div>` : ''}
                         <button class="btn-edit-campaign"
