@@ -633,6 +633,66 @@ def get_clinic_duplicates():
     return jsonify({'exact': exact, 'similar': similar})
 
 
+@app.route('/api/clinics/merge', methods=['POST'])
+def merge_clinics():
+    """
+    合併兩筆重複診所：
+    - keep_id   保留的那筆
+    - delete_id 刪除的那筆（活動/百位關聯轉移到 keep）
+    """
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    data      = request.get_json() or {}
+    keep_id   = data.get('keep_id')
+    delete_id = data.get('delete_id')
+    if not keep_id or not delete_id or keep_id == delete_id:
+        return jsonify({'error': '參數錯誤'}), 400
+
+    try:
+        keep   = Clinic.query.get(keep_id)
+        delete = Clinic.query.get(delete_id)
+        if not keep:
+            return jsonify({'error': f'找不到診所 id:{keep_id}'}), 404
+        if not delete:
+            return jsonify({'error': f'找不到診所 id:{delete_id}'}), 404
+
+        # 用被刪筆補齊保留筆缺少的欄位
+        for field in ('phone', 'phone_normalized', 'address', 'contact_person', 'specialties', 'region', 'district', 'note'):
+            if not getattr(keep, field) and getattr(delete, field):
+                setattr(keep, field, getattr(delete, field))
+
+        # 合作項目取聯集
+        for col in ('col_yaodai', 'col_haibao', 'col_paiyang', 'col_baiwei'):
+            if getattr(delete, col):
+                setattr(keep, col, True)
+
+        # 轉移 campaign_clinic 關聯（跳過已存在的）
+        for link in CampaignClinic.query.filter_by(clinic_id=delete_id).all():
+            exists = CampaignClinic.query.filter_by(campaign_id=link.campaign_id, clinic_id=keep_id).first()
+            if not exists:
+                link.clinic_id = keep_id
+            else:
+                db.session.delete(link)
+
+        # 轉移 baiwei_doctor 關聯
+        BaiweiDoctor.query.filter_by(clinic_id=delete_id).update({'clinic_id': keep_id})
+
+        # 軟刪除被合併的那筆
+        delete.status = 'deleted'
+
+        db.session.commit()
+
+        _write_audit('合併', keep.name, keep_id,
+                     detail=f'合併自 id:{delete_id}（{delete.name}）')
+        return jsonify({'success': True})
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/specialties')
 def get_specialties():
     """回傳系統標準科別白名單，供各頁面科別下拉選單使用"""
