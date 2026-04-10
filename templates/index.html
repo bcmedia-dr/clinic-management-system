@@ -1982,11 +1982,7 @@
 
         function renderDupGroup(groupLabel, clinics, showName) {
             const mergeBtn = clinics.length === 2
-                ? `<button onclick="showMergeModal(${clinics[0].id},'${clinics[0].name.replace(/'/g,"\\'")}',${clinics[1].id},'${clinics[1].name.replace(/'/g,"\\'")}',
-                        '${clinics[0].region}${clinics[0].district}','${clinics[0].phone || ''}',
-                        '${clinics[1].region}${clinics[1].district}','${clinics[1].phone || ''}')"
-                   style="background:#8b5cf6;color:white;border:none;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:13px;margin-left:10px;">
-                   🔗 合併</button>`
+                ? `<button onclick="showMergeModal(${clinics[0].id},${JSON.stringify(clinics[0].name)},${clinics[1].id},${JSON.stringify(clinics[1].name)},'${clinics[0].region}${clinics[0].district}','${clinics[0].phone||''}','${clinics[1].region}${clinics[1].district}','${clinics[1].phone||''}')" style="background:#8b5cf6;color:white;border:none;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:13px;margin-left:10px;">🔗 合併</button>`
                 : '';
             let html = `<div style="border:1px solid #eee;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
                 <div style="font-weight:600;color:#333;margin-bottom:8px;display:flex;align-items:center;">
@@ -2045,21 +2041,31 @@
         }
 
         async function confirmMerge() {
-            const which  = document.getElementById('mergeKeep').value;
-            const keepId   = parseInt(document.getElementById(which === 'A' ? 'mergeOptionA' : 'mergeOptionB').dataset.id);
-            const deleteId = parseInt(document.getElementById(which === 'A' ? 'mergeOptionB' : 'mergeOptionA').dataset.id);
-            const res = await fetch('/api/clinics/merge', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({keep_id: keepId, delete_id: deleteId})
-            });
-            const data = await res.json();
-            if (data.success) {
-                document.getElementById('mergeModal').style.display = 'none';
-                loadDuplicates();
-                loadClinics();
-            } else {
-                alert('合併失敗：' + (data.error || '未知錯誤'));
+            const which    = document.getElementById('mergeKeep').value;
+            const keepEl   = document.getElementById(which === 'A' ? 'mergeOptionA' : 'mergeOptionB');
+            const deleteEl = document.getElementById(which === 'A' ? 'mergeOptionB' : 'mergeOptionA');
+            const keepId   = parseInt(keepEl.dataset.id);
+            const deleteId = parseInt(deleteEl.dataset.id);
+            if (!keepId || !deleteId) {
+                alert('錯誤：找不到診所 ID，請重新開啟合併視窗');
+                return;
+            }
+            try {
+                const res  = await fetch('/api/clinics/merge', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({keep_id: keepId, delete_id: deleteId})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('mergeModal').style.display = 'none';
+                    loadDuplicates();
+                    loadClinics();
+                } else {
+                    alert('合併失敗：' + (data.error || '未知錯誤') + '（HTTP ' + res.status + '）');
+                }
+            } catch(e) {
+                alert('合併失敗（網路錯誤）：' + e.message);
             }
         }
 
