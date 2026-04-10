@@ -654,8 +654,7 @@
             if (!campaign) return;
 
             currentCampaignName = campaign.name;
-            document.getElementById('detailName').textContent  = campaign.name;
-            document.getElementById('detailBrand').textContent = campaign.brand || '-';
+            document.getElementById('detailBrand').textContent = campaign.brand || campaign.name || '-';
             document.getElementById('detailYear').textContent  = fmtPeriod(campaign.year, campaign.month);
             document.getElementById('detailCount').textContent = campaign.clinic_count;
             if (campaign.note) {
