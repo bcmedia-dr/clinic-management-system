@@ -1965,6 +1965,20 @@ def deduplicate_baiwei():
     return jsonify({'success': True, 'deleted': deleted})
 
 
+@app.route('/api/baiwei/clear-all', methods=['POST'])
+def clear_all_baiwei():
+    """清空百位醫師總表（不動診所管理總表）"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    BaiweiParticipation.query.delete()
+    count = BaiweiDoctor.query.count()
+    BaiweiDoctor.query.delete()
+    # 將所有診所的 col_baiwei 重設為 False
+    Clinic.query.filter_by(col_baiwei=True).update({'col_baiwei': False})
+    db.session.commit()
+    return jsonify({'success': True, 'deleted': count})
+
+
 @app.route('/api/baiwei/<int:doc_id>', methods=['DELETE'])
 def delete_baiwei(doc_id):
     if session.get('role') != 'admin':

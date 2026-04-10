@@ -177,6 +177,7 @@
                 <button class="btn-export" onclick="exportExcel()">📥 匯出名單</button>
                 <button class="btn-primary" onclick="showAddDoctorModal()">＋ 手動新增</button>
                 <button style="background:#f59e0b;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;" onclick="showDupModal()">🔍 查重複</button>
+                <button style="background:#f5576c;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;" onclick="clearAllDoctors()">🗑️ 清空全部</button>
             </div>
         </div>
         <div class="table-container">
@@ -743,6 +744,21 @@ async function confirmAddDoctors() {
         if (c) { c.count += data.added; document.getElementById('campaignInfo').textContent = `${c.count} 位醫師`; }
     } else {
         alert('加入失敗：' + (data.error || '未知錯誤'));
+    }
+}
+
+// ══ 清空全部 ══
+async function clearAllDoctors() {
+    const total = document.getElementById('statTotal').textContent;
+    if (!confirm(`確定清空百位醫師總表全部 ${total} 筆資料？\n\n⚠️ 此操作無法復原，活動記錄關聯也會一併清除。\n診所管理總表不受影響。`)) return;
+    if (!confirm('再次確認：確定要清空全部百位醫師資料嗎？')) return;
+    const res  = await fetch('/api/baiwei/clear-all', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+        alert(`✅ 已清空 ${data.deleted} 筆資料`);
+        loadData();
+    } else {
+        alert('清空失敗：' + (data.error || '未知錯誤'));
     }
 }
 
