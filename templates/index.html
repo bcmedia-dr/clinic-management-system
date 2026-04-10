@@ -1010,11 +1010,9 @@
             <p style="color:#666;font-size:13px;margin-bottom:16px;">選擇要保留的診所，另一筆資料將被刪除。缺少的欄位會自動從被刪除的診所補齊，活動記錄也會一併轉移。</p>
             <div style="display:flex;gap:12px;margin-bottom:20px;">
                 <div id="mergeOptionA" data-id=""
-                     onclick="selectMergeKeep('A')"
                      style="flex:1;border:2px solid #ddd;border-radius:8px;padding:14px;cursor:pointer;transition:border-color .2s;">
                 </div>
                 <div id="mergeOptionB" data-id=""
-                     onclick="selectMergeKeep('B')"
                      style="flex:1;border:2px solid #ddd;border-radius:8px;padding:14px;cursor:pointer;transition:border-color .2s;">
                 </div>
             </div>
@@ -2025,6 +2023,9 @@
                 `<strong>${nameB}</strong><br><span style="font-size:13px;color:#777;">${locationB}　${phoneB || '無電話'}</span><br><span style="font-size:12px;color:#aaa;">id:${idB}</span>`;
             document.getElementById('mergeOptionA').dataset.id = idA;
             document.getElementById('mergeOptionB').dataset.id = idB;
+            // 動態綁定 onclick（避免 innerHTML 刷新後失效）
+            document.getElementById('mergeOptionA').onclick = () => selectMergeKeep('A');
+            document.getElementById('mergeOptionB').onclick = () => selectMergeKeep('B');
             // 預設選 A
             selectMergeKeep('A');
         }
