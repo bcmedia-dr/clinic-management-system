@@ -1921,6 +1921,50 @@ def import_baiwei():
         return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
 
 
+@app.route('/api/baiwei/duplicates', methods=['GET'])
+def get_baiwei_duplicates():
+    """回傳百位總表中重複的醫師群組（同電話＋同醫師姓名）"""
+    all_docs = BaiweiDoctor.query.order_by(BaiweiDoctor.id).all()
+    groups = {}
+    for d in all_docs:
+        key = (_normalize_phone(d.phone), (d.doctor_name or '').strip())
+        if key not in groups:
+            groups[key] = []
+        groups[key].append({
+            'id':          d.id,
+            'doctor_name': d.doctor_name or '',
+            'clinic_name': d.clinic_name or '',
+            'region':      d.region or '',
+            'specialty':   d.specialty or '',
+            'phone':       d.phone or '',
+        })
+    duplicates = [v for v in groups.values() if len(v) > 1]
+    return jsonify({'groups': duplicates, 'total_extra': sum(len(g) - 1 for g in duplicates)})
+
+
+@app.route('/api/baiwei/deduplicate', methods=['POST'])
+def deduplicate_baiwei():
+    """刪除百位總表重複記錄，每組保留 id 最小的那筆"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    all_docs = BaiweiDoctor.query.order_by(BaiweiDoctor.id).all()
+    groups = {}
+    for d in all_docs:
+        key = (_normalize_phone(d.phone), (d.doctor_name or '').strip())
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(d)
+    deleted = 0
+    for docs in groups.values():
+        if len(docs) > 1:
+            for dup in docs[1:]:  # 保留第一筆（id最小），刪除其餘
+                BaiweiParticipation.query.filter_by(doctor_id=dup.id).delete()
+                db.session.delete(dup)
+                deleted += 1
+    db.session.commit()
+    return jsonify({'success': True, 'deleted': deleted})
+
+
 @app.route('/api/baiwei/<int:doc_id>', methods=['DELETE'])
 def delete_baiwei(doc_id):
     if session.get('role') != 'admin':

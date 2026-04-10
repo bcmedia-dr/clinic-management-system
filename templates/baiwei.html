@@ -176,6 +176,7 @@
                 <div class="spacer"></div>
                 <button class="btn-export" onclick="exportExcel()">📥 匯出名單</button>
                 <button class="btn-primary" onclick="showAddDoctorModal()">＋ 手動新增</button>
+                <button style="background:#f59e0b;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;" onclick="showDupModal()">🔍 查重複</button>
             </div>
         </div>
         <div class="table-container">
@@ -236,6 +237,24 @@
         </div>
         <div id="campaignEmptyHint" style="background:var(--card);border-radius:15px;padding:60px;text-align:center;color:var(--muted);box-shadow:0 2px 10px var(--shadow);">
             請選擇或新增一個活動
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal：查重複 ── -->
+<div class="modal" id="dupModal">
+    <div class="modal-content wide">
+        <div class="modal-header">
+            <h2>🔍 重複醫師檢查</h2>
+            <button class="close-btn" onclick="closeDupModal()">&times;</button>
+        </div>
+        <div id="dupContent" style="margin-bottom:16px;"></div>
+        <div style="display:flex;gap:12px;">
+            <button class="btn-confirm-add" id="btnDeleteDup" onclick="deleteAllDups()" disabled
+                style="background:linear-gradient(135deg,#f5576c,#d63f52);">
+                🗑️ 一鍵刪除重複（保留最早一筆）
+            </button>
+            <button class="btn-submit" onclick="closeDupModal()" style="background:#999;width:auto;padding:12px 24px;">關閉</button>
         </div>
     </div>
 </div>
@@ -727,6 +746,50 @@ async function confirmAddDoctors() {
     }
 }
 
+// ══ 查重複 ══
+async function showDupModal() {
+    document.getElementById('dupContent').innerHTML = '<p style="color:#aaa;text-align:center;padding:20px;">載入中...</p>';
+    document.getElementById('btnDeleteDup').disabled = true;
+    document.getElementById('dupModal').classList.add('show');
+    const res  = await fetch('/api/baiwei/duplicates');
+    const data = await res.json();
+    const el   = document.getElementById('dupContent');
+    if (data.groups.length === 0) {
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:#4ade80;font-size:16px;font-weight:600;">✅ 沒有重複記錄</div>';
+        return;
+    }
+    document.getElementById('btnDeleteDup').disabled = false;
+    document.getElementById('btnDeleteDup').textContent = `🗑️ 一鍵刪除重複（共 ${data.total_extra} 筆多餘記錄，保留最早一筆）`;
+    let html = `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;">
+        發現 <strong>${data.groups.length}</strong> 組重複，共 <strong>${data.total_extra}</strong> 筆多餘記錄
+    </div>`;
+    data.groups.forEach((group, i) => {
+        html += `<div style="background:var(--hover);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--text);">
+                第${i+1}組：${group[0].doctor_name} ／ ${group[0].clinic_name} ／ ${group[0].phone}
+            </div>
+            ${group.map((d, j) => `<div style="padding:2px 8px;color:${j===0?'#4ade80':'#f5576c'};">
+                ${j===0?'✅ 保留':'🗑️ 刪除'} id=${d.id}　${d.region}　${d.specialty}
+            </div>`).join('')}
+        </div>`;
+    });
+    el.innerHTML = html;
+}
+function closeDupModal() { document.getElementById('dupModal').classList.remove('show'); }
+
+async function deleteAllDups() {
+    if (!confirm('確定刪除所有多餘重複記錄？每組保留最早一筆。')) return;
+    const res  = await fetch('/api/baiwei/deduplicate', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+        alert(`✅ 已刪除 ${data.deleted} 筆重複記錄`);
+        closeDupModal();
+        loadData();
+    } else {
+        alert('刪除失敗：' + (data.error || '未知錯誤'));
+    }
+}
+
 // ══ 手動新增醫師 ══
 function showAddDoctorModal() {
     ['addDocName','addDocSpecialty','addDocClinic','addDocPhone','addDocRegion'].forEach(id => document.getElementById(id).value = '');
@@ -951,7 +1014,7 @@ async function confirmBwImport() {
 }
 
 // 點 modal 外部關閉
-['importModal','addCampaignModal','pickDoctorsModal','addDoctorModal','importCampaignModal'].forEach(id => {
+['importModal','addCampaignModal','pickDoctorsModal','addDoctorModal','importCampaignModal','dupModal'].forEach(id => {
     document.getElementById(id).addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('show');
     });
