@@ -175,7 +175,7 @@
                 <span class="total-count" id="totalCount"></span>
                 <div class="spacer"></div>
                 <button class="btn-export" onclick="exportExcel()">📥 匯出名單</button>
-                <button class="btn-import-main" onclick="showImportModal()">📤 匯入 Excel</button>
+                <button class="btn-primary" onclick="showAddDoctorModal()">＋ 手動新增</button>
             </div>
         </div>
         <div class="table-container">
@@ -202,6 +202,7 @@
             </select>
             <span class="campaign-info" id="campaignInfo"></span>
             <div class="spacer"></div>
+            <button class="btn-import-main" id="btnImportCampaign" onclick="showImportCampaignModal()" style="display:none">📤 匯入名單</button>
             <button class="btn-export" id="btnExportCampaign" onclick="exportCampaign()" style="display:none">📥 匯出名單</button>
             <button class="btn-danger" id="btnDelCampaign" onclick="deleteCampaign()" style="display:none;background:none;border:1px solid #f5576c;color:#f5576c;padding:10px 16px;border-radius:10px;">🗑️ 刪除活動</button>
             <button class="btn-new-campaign" onclick="showAddCampaignModal()">＋ 新增活動</button>
@@ -236,6 +237,68 @@
         <div id="campaignEmptyHint" style="background:var(--card);border-radius:15px;padding:60px;text-align:center;color:var(--muted);box-shadow:0 2px 10px var(--shadow);">
             請選擇或新增一個活動
         </div>
+    </div>
+</div>
+
+<!-- ── Modal：手動新增醫師 ── -->
+<div class="modal" id="addDoctorModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>＋ 手動新增醫師</h2>
+            <button class="close-btn" onclick="closeAddDoctorModal()">&times;</button>
+        </div>
+        <div class="form-group">
+            <label>醫師名字 <span style="color:#e96c2c;">*</span></label>
+            <input class="form-input" id="addDocName" placeholder="例：王大明">
+        </div>
+        <div class="form-group">
+            <label>科別</label>
+            <input class="form-input" id="addDocSpecialty" placeholder="例：婦產科">
+        </div>
+        <div class="form-group">
+            <label>診所名稱</label>
+            <input class="form-input" id="addDocClinic" placeholder="例：仁愛診所">
+        </div>
+        <div class="form-group">
+            <label>電話 <span style="color:#e96c2c;">*</span></label>
+            <input class="form-input" id="addDocPhone" placeholder="例：02-2345-6789">
+        </div>
+        <div class="form-group">
+            <label>縣市</label>
+            <input class="form-input" id="addDocRegion" placeholder="例：台北市">
+        </div>
+        <button class="btn-submit" onclick="submitAddDoctor()">新增醫師</button>
+        <div class="import-result" id="addDoctorResult"></div>
+    </div>
+</div>
+
+<!-- ── Modal：活動匯入名單 ── -->
+<div class="modal" id="importCampaignModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>📤 匯入活動名單</h2>
+            <button class="close-btn" onclick="closeImportCampaignModal()">&times;</button>
+        </div>
+        <div id="icStep1">
+            <div class="format-hint">
+                <strong>Excel 欄位格式：</strong><br>
+                縣市 ／ 區域 ／ 診所名稱 ／ 地址 ／ 電話 ／ 醫師 ／ 科別<br>
+                <span style="color:#888;font-size:12px;">電話比對總表，無則自動新增；醫師同時加入此活動</span>
+            </div>
+            <div class="file-input-wrap">
+                <label>選擇 Excel 檔案（.xlsx）</label>
+                <input type="file" id="icFile" accept=".xlsx">
+            </div>
+            <button class="btn-submit" id="icPreviewBtn" onclick="previewImportCampaign()">🔍 預覽</button>
+        </div>
+        <div id="icStep2" style="display:none;">
+            <div id="icPreviewResult"></div>
+            <div style="display:flex;gap:12px;margin-top:16px;">
+                <button class="btn-submit" onclick="confirmImportCampaign()" style="background:linear-gradient(135deg,#4ade80,#22c55e);flex:1;">✅ 確認匯入</button>
+                <button class="btn-submit" onclick="cancelImportCampaign()" style="background:#999;flex:0 0 auto;padding:14px 24px;">取消</button>
+            </div>
+        </div>
+        <div class="import-result" id="icResult"></div>
     </div>
 </div>
 
@@ -445,6 +508,7 @@ function onCampaignChange() {
     currentCampaignId = val ? parseInt(val) : null;
     const campaign = allCampaigns.find(c => c.id === currentCampaignId);
 
+    document.getElementById('btnImportCampaign').style.display = campaign ? '' : 'none';
     document.getElementById('btnExportCampaign').style.display = campaign ? '' : 'none';
     document.getElementById('btnDelCampaign').style.display    = campaign ? '' : 'none';
     document.getElementById('campaignDoctorSection').style.display = campaign ? '' : 'none';
@@ -642,6 +706,116 @@ async function confirmAddDoctors() {
     }
 }
 
+// ══ 手動新增醫師 ══
+function showAddDoctorModal() {
+    ['addDocName','addDocSpecialty','addDocClinic','addDocPhone','addDocRegion'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('addDoctorResult').style.display = 'none';
+    document.getElementById('addDoctorModal').classList.add('show');
+}
+function closeAddDoctorModal() { document.getElementById('addDoctorModal').classList.remove('show'); }
+
+async function submitAddDoctor() {
+    const name   = document.getElementById('addDocName').value.trim();
+    const phone  = document.getElementById('addDocPhone').value.trim();
+    if (!name || !phone) { alert('醫師名字和電話為必填'); return; }
+    const res = await fetch('/api/baiwei', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            doctor_name: name,
+            phone,
+            specialty: document.getElementById('addDocSpecialty').value.trim(),
+            clinic_name: document.getElementById('addDocClinic').value.trim(),
+            region: document.getElementById('addDocRegion').value.trim(),
+        }),
+    });
+    const data = await res.json();
+    const el = document.getElementById('addDoctorResult');
+    el.style.display = 'block';
+    if (data.success) {
+        el.className = 'import-result success';
+        el.textContent = '✅ 新增成功';
+        loadData();
+        setTimeout(() => closeAddDoctorModal(), 1000);
+    } else {
+        el.className = 'import-result error';
+        el.textContent = '❌ ' + (data.error || '新增失敗');
+    }
+}
+
+// ══ 活動匯入名單 ══
+function showImportCampaignModal() {
+    document.getElementById('icFile').value = '';
+    document.getElementById('icStep1').style.display = 'block';
+    document.getElementById('icStep2').style.display = 'none';
+    document.getElementById('icResult').style.display = 'none';
+    document.getElementById('importCampaignModal').classList.add('show');
+}
+function closeImportCampaignModal() { document.getElementById('importCampaignModal').classList.remove('show'); }
+
+async function previewImportCampaign() {
+    const file = document.getElementById('icFile').files[0];
+    if (!file) { alert('請選擇檔案'); return; }
+    const btn = document.getElementById('icPreviewBtn');
+    btn.disabled = true; btn.textContent = '分析中...';
+    const form = new FormData();
+    form.append('file', file);
+    try {
+        const res = await fetch(`/api/baiwei-campaigns/${currentCampaignId}/import?dry_run=true`, { method: 'POST', body: form });
+        const result = await res.json();
+        if (result.error) { alert(result.error); return; }
+        const skipLabel = result.would_update > 0 ? `　⏭️ 主表已有 ${result.would_update} 筆` : '';
+        document.getElementById('icPreviewResult').innerHTML = `
+            <div style="background:#e8f4fd;border:1px solid #bee3f8;border-radius:8px;padding:15px;margin-bottom:12px;">
+                <strong>📊 匯入預覽</strong><br>
+                🆕 新增醫師 ${result.would_create} 位${skipLabel}<br>
+                📋 加入本活動 ${result.would_add || (result.would_create + result.would_update)} 位
+            </div>
+            ${result.errors && result.errors.length ? `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:12px;">⚠️ ${result.errors.slice(0,3).join('<br>')}</div>` : ''}
+        `;
+        document.getElementById('icStep1').style.display = 'none';
+        document.getElementById('icStep2').style.display = 'block';
+    } catch(e) {
+        alert('預覽失敗：' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = '🔍 預覽';
+    }
+}
+function cancelImportCampaign() {
+    document.getElementById('icStep1').style.display = 'block';
+    document.getElementById('icStep2').style.display = 'none';
+    document.getElementById('icFile').value = '';
+}
+async function confirmImportCampaign() {
+    const file = document.getElementById('icFile').files[0];
+    if (!file) { alert('請重新選擇檔案'); cancelImportCampaign(); return; }
+    const form = new FormData();
+    form.append('file', file);
+    try {
+        const res = await fetch(`/api/baiwei-campaigns/${currentCampaignId}/import`, { method: 'POST', body: form });
+        const data = await res.json();
+        const el = document.getElementById('icResult');
+        document.getElementById('icStep2').style.display = 'none';
+        el.style.display = 'block';
+        if (data.success) {
+            el.className = 'import-result success';
+            el.innerHTML = `✅ 匯入完成：新增 <strong>${data.new}</strong> 位醫師，加入活動 <strong>${data.added}</strong> 位`;
+            loadCampaignDoctors();
+            loadData();
+            const c = allCampaigns.find(x => x.id === currentCampaignId);
+            if (c) { c.count += data.added; document.getElementById('campaignInfo').textContent = `${c.count} 位醫師`; }
+        } else {
+            el.className = 'import-result error';
+            el.textContent = '❌ ' + (data.error || '匯入失敗');
+        }
+    } catch(e) {
+        const el = document.getElementById('icResult');
+        el.className = 'import-result error';
+        el.textContent = '❌ ' + e.message;
+        el.style.display = 'block';
+    }
+}
+
 // ══ 匯入 Modal ══
 function showImportModal() {
     document.getElementById('importModal').classList.add('show');
@@ -756,7 +930,7 @@ async function confirmBwImport() {
 }
 
 // 點 modal 外部關閉
-['importModal','addCampaignModal','pickDoctorsModal'].forEach(id => {
+['importModal','addCampaignModal','pickDoctorsModal','addDoctorModal','importCampaignModal'].forEach(id => {
     document.getElementById(id).addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('show');
     });

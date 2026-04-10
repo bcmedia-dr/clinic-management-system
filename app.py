@@ -2097,6 +2097,206 @@ def export_baiwei_campaign(campaign_id):
                      as_attachment=True, download_name=filename)
 
 
+@app.route('/api/baiwei', methods=['POST'])
+def add_baiwei_doctor():
+    """手動新增單筆百位醫師"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    data = request.get_json() or {}
+    doctor_name = (data.get('doctor_name') or '').strip()
+    phone_raw   = (data.get('phone') or '').strip()
+    if not doctor_name:
+        return jsonify({'error': '醫師名字不可空白'}), 400
+    if not phone_raw:
+        return jsonify({'error': '電話不可空白'}), 400
+    phone_fmt  = format_phone(phone_raw, data.get('region') or None)
+    normalized = _normalize_phone(phone_fmt)
+    # 比對診所
+    clinic = Clinic.query.filter(Clinic.status != 'deleted').filter_by(phone_normalized=normalized).first()
+    if clinic is None and data.get('clinic_name'):
+        from import_custom import _parse_name
+        name, extracted_note = _parse_name(data.get('clinic_name'))
+        clinic = Clinic(
+            region=data.get('region') or None, district=data.get('district') or None,
+            name=name, phone=phone_fmt, phone_normalized=normalized or None,
+        )
+        db.session.add(clinic)
+        db.session.flush()
+    if clinic:
+        clinic.col_baiwei = True
+    doc = BaiweiDoctor(
+        clinic_id   = clinic.id if clinic else None,
+        clinic_name = (data.get('clinic_name') or '').strip() or (clinic.name if clinic else None),
+        region      = data.get('region') or (clinic.region if clinic else None),
+        district    = data.get('district') or (clinic.district if clinic else None),
+        phone       = phone_fmt,
+        doctor_name = doctor_name,
+        specialty   = normalize_specialty(data.get('specialty') or '') or None,
+    )
+    db.session.add(doc)
+    db.session.commit()
+    return jsonify({'success': True, 'id': doc.id})
+
+
+@app.route('/api/baiwei-campaigns/<int:campaign_id>/import', methods=['POST'])
+def import_baiwei_campaign(campaign_id):
+    """匯入 Excel 到指定百位活動（同時更新醫師主表）"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': '權限不足'}), 403
+    campaign = BaiweiCampaign.query.get_or_404(campaign_id)
+    if 'file' not in request.files:
+        return jsonify({'error': '沒有上傳檔案'}), 400
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': '只接受 .xlsx 格式'}), 400
+
+    filename  = secure_filename(file.filename)
+    temp_path = os.path.join('/tmp', filename)
+    file.save(temp_path)
+
+    try:
+        wb = load_workbook(temp_path, read_only=True, data_only=True)
+        ws = wb.active
+        os.remove(temp_path)
+
+        # 偵測 header 行
+        header_row_idx = None
+        header = []
+        for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=5, values_only=True), start=1):
+            stripped = [str(v).strip() if v is not None else '' for v in row]
+            if '電話' in stripped:
+                header_row_idx = row_idx
+                header = stripped
+                break
+        if header_row_idx is None:
+            return jsonify({'error': '找不到含「電話」的標題行（掃描前 5 行）'}), 400
+
+        col = {name: idx for idx, name in enumerate(header)}
+
+        def _get(row, *keys):
+            for k in keys:
+                idx = col.get(k)
+                if idx is not None and idx < len(row) and row[idx] is not None:
+                    return str(row[idx]).strip()
+            return ''
+
+        phone_to_clinic = {}
+        for c in Clinic.query.filter(Clinic.status != 'deleted').all():
+            np = _normalize_phone(c.phone)
+            if np:
+                phone_to_clinic[np] = c
+
+        existing_keys = {
+            (_normalize_phone(d.phone), (d.doctor_name or '').strip())
+            for d in BaiweiDoctor.query.all()
+        }
+        # 已在此活動的醫師 id set
+        in_campaign = {p.doctor_id for p in BaiweiParticipation.query.filter_by(campaign_id=campaign_id).all()}
+
+        dry_run = request.args.get('dry_run') == 'true'
+        new_count = already_count = added_count = 0
+        errors = []
+        preview = []
+
+        consecutive_blank = 0
+        for row_num, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True), start=header_row_idx + 1):
+            if not any(row):
+                consecutive_blank += 1
+                if consecutive_blank >= 5:
+                    break
+                continue
+            consecutive_blank = 0
+
+            phone_raw   = _get(row, '電話')
+            doctor_name = _get(row, '醫師', '醫師名字')
+            phone_fmt   = format_phone(phone_raw, _get(row, '縣市') or None)
+            normalized  = _normalize_phone(phone_fmt)
+
+            if not normalized:
+                errors.append(f'第{row_num}列：缺少電話')
+                continue
+            if not doctor_name:
+                errors.append(f'第{row_num}列：缺少醫師名字')
+                continue
+
+            # 找或建 clinic
+            clinic = phone_to_clinic.get(normalized)
+            if clinic is None:
+                raw_name = _get(row, '診所名稱', '院名')
+                if not raw_name:
+                    errors.append(f'第{row_num}列：總表無此電話且缺少診所名稱')
+                    continue
+                from import_custom import _parse_name
+                name, extracted_note = _parse_name(raw_name)
+                if not name:
+                    errors.append(f'第{row_num}列：診所名稱清理後為空')
+                    continue
+                clinic = Clinic(
+                    region=_get(row, '縣市') or None, district=_get(row, '區域') or None,
+                    name=name, address=_get(row, '地址') or None,
+                    phone=phone_fmt, phone_normalized=normalized or None,
+                    note=extracted_note or None,
+                )
+                try:
+                    sp = db.session.begin_nested()
+                    db.session.add(clinic)
+                    db.session.flush()
+                    phone_to_clinic[normalized] = clinic
+                except IntegrityError:
+                    sp.rollback()
+                    clinic = Clinic.query.filter_by(phone_normalized=normalized).first()
+                    if not clinic:
+                        errors.append(f'第{row_num}列：電話衝突但查無既有診所，跳過')
+                        continue
+                    phone_to_clinic[normalized] = clinic
+
+            clinic.col_baiwei = True
+
+            # 找或建 baiwei_doctor
+            key = (normalized, doctor_name)
+            if key in existing_keys:
+                # 醫師已在主表，只加活動關聯
+                doc = BaiweiDoctor.query.filter_by(phone=phone_fmt, doctor_name=doctor_name).first()
+                already_count += 1
+            else:
+                doc = BaiweiDoctor(
+                    clinic_id=clinic.id, clinic_name=_get(row, '診所名稱', '院名') or clinic.name,
+                    region=_get(row, '縣市') or clinic.region, district=_get(row, '區域') or clinic.district,
+                    address=_get(row, '地址') or clinic.address, phone=phone_fmt, doctor_name=doctor_name,
+                    specialty=normalize_specialty(_get(row, '科別')) or None,
+                )
+                db.session.add(doc)
+                db.session.flush()
+                existing_keys.add(key)
+                new_count += 1
+
+            # 加活動關聯
+            if doc and doc.id not in in_campaign:
+                db.session.add(BaiweiParticipation(doctor_id=doc.id, campaign_id=campaign_id))
+                in_campaign.add(doc.id)
+                added_count += 1
+
+            if len(preview) < 10:
+                preview.append({'name': _get(row, '診所名稱', '院名') or (clinic.name if clinic else ''),
+                                 'phone': phone_fmt, 'action': 'create' if key not in existing_keys else 'skip',
+                                 'region': _get(row, '縣市')})
+
+        if dry_run:
+            db.session.rollback()
+            return jsonify({'dry_run': True, 'would_create': new_count, 'would_update': already_count,
+                            'would_add': added_count, 'errors': errors, 'preview': preview})
+
+        db.session.commit()
+        return jsonify({'success': True, 'new': new_count, 'already_exists': already_count,
+                        'added': added_count, 'errors': errors})
+
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        db.session.rollback()
+        return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
+
+
 # ── 工具函式 ─────────────────────────────────────────────────
 
 def _normalize_phone(phone):
