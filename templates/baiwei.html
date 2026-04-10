@@ -348,6 +348,16 @@
             <input class="form-input" id="inputCampaignYear" type="number" placeholder="2026" min="2000" max="2099">
         </div>
         <div class="form-group">
+            <label>月份</label>
+            <select class="form-input" id="inputCampaignMonth">
+                <option value="">不指定</option>
+                <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+                <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+                <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+                <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label>備註</label>
             <input class="form-input" id="inputCampaignNote" placeholder="選填">
         </div>
@@ -396,6 +406,15 @@ function toggleDark() {
     var btn = document.getElementById('darkBtn');
     if (btn && document.documentElement.classList.contains('dark')) btn.textContent = '☀️ 亮色';
 })();
+
+// ══ Helper ══
+function fmtBaiweiCampaign(c) {
+    let s = '';
+    if (c.year)  s += c.year + '年';
+    if (c.month) s += c.month + '月';
+    s += c.name;
+    return s;
+}
 
 // ══ 狀態 ══
 let allData         = [];   // 醫師總表
@@ -494,7 +513,7 @@ async function loadCampaigns() {
     allCampaigns.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = c.year ? `${c.name}（${c.year}）` : c.name;
+        opt.textContent = fmtBaiweiCampaign(c);
         sel.appendChild(opt);
     });
     if (prev && allCampaigns.find(c => c.id == prev)) {
@@ -591,6 +610,7 @@ async function deleteCampaign() {
 function showAddCampaignModal() {
     document.getElementById('inputCampaignName').value = '';
     document.getElementById('inputCampaignYear').value = '';
+    document.getElementById('inputCampaignMonth').value = '';
     document.getElementById('inputCampaignNote').value = '';
     document.getElementById('campaignCreateResult').style.display = 'none';
     document.getElementById('addCampaignModal').classList.add('show');
@@ -600,12 +620,13 @@ function closeAddCampaignModal() { document.getElementById('addCampaignModal').c
 async function createCampaign() {
     const name = document.getElementById('inputCampaignName').value.trim();
     if (!name) { alert('請輸入活動名稱'); return; }
-    const year = document.getElementById('inputCampaignYear').value;
-    const note = document.getElementById('inputCampaignNote').value.trim();
+    const year  = document.getElementById('inputCampaignYear').value;
+    const month = document.getElementById('inputCampaignMonth').value;
+    const note  = document.getElementById('inputCampaignNote').value.trim();
     const res = await fetch('/api/baiwei-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, year: year ? parseInt(year) : null, note: note || null }),
+        body: JSON.stringify({ name, year: year ? parseInt(year) : null, month: month ? parseInt(month) : null, note: note || null }),
     });
     const data = await res.json();
     if (data.id) {

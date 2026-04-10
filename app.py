@@ -125,6 +125,7 @@ class BaiweiCampaign(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(200), nullable=False)
     year       = db.Column(db.Integer)
+    month      = db.Column(db.Integer)
     note       = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -1986,6 +1987,7 @@ def get_baiwei_campaigns():
         'id':    c.id,
         'name':  c.name,
         'year':  c.year,
+        'month': c.month,
         'note':  c.note or '',
         'count': BaiweiParticipation.query.filter_by(campaign_id=c.id).count(),
     } for c in campaigns])
@@ -1999,10 +2001,10 @@ def create_baiwei_campaign():
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify({'error': '活動名稱不可空白'}), 400
-    c = BaiweiCampaign(name=name, year=data.get('year') or None, note=data.get('note') or None)
+    c = BaiweiCampaign(name=name, year=data.get('year') or None, month=data.get('month') or None, note=data.get('note') or None)
     db.session.add(c)
     db.session.commit()
-    return jsonify({'id': c.id, 'name': c.name, 'year': c.year, 'note': c.note or '', 'count': 0})
+    return jsonify({'id': c.id, 'name': c.name, 'year': c.year, 'month': c.month, 'note': c.note or '', 'count': 0})
 
 
 @app.route('/api/baiwei-campaigns/<int:campaign_id>', methods=['DELETE'])
@@ -2010,6 +2012,7 @@ def delete_baiwei_campaign(campaign_id):
     if session.get('role') != 'admin':
         return jsonify({'error': '權限不足'}), 403
     c = BaiweiCampaign.query.get_or_404(campaign_id)
+    BaiweiParticipation.query.filter_by(campaign_id=campaign_id).delete()
     db.session.delete(c)
     db.session.commit()
     return jsonify({'success': True})
@@ -2375,6 +2378,7 @@ with app.app_context():
         'CREATE INDEX IF NOT EXISTS idx_campaign_clinic_clinic_id ON campaign_clinic(clinic_id)',
         # 移除廢棄欄位（已被 col_yaodai/col_haibao/col_paiyang/col_baiwei 取代）
         'ALTER TABLE clinic DROP COLUMN IF EXISTS media_items',
+        'ALTER TABLE baiwei_campaign ADD COLUMN IF NOT EXISTS month INTEGER',
         # 百位活動表
         """CREATE TABLE IF NOT EXISTS baiwei_campaign (
             id SERIAL PRIMARY KEY,
@@ -2408,6 +2412,21 @@ with app.app_context():
                 _conn.commit()
         except Exception:
             pass
+
+    # 一次性修正：補上 baiwei_doctor 電話區碼（phone 不以 '0' 開頭的記錄）
+    try:
+        _docs_to_fix = BaiweiDoctor.query.filter(
+            BaiweiDoctor.phone.isnot(None),
+            ~BaiweiDoctor.phone.like('0%')
+        ).all()
+        for _d in _docs_to_fix:
+            _new_phone = format_phone(_d.phone, _d.region or None)
+            if _new_phone != _d.phone:
+                _d.phone = _new_phone
+        if _docs_to_fix:
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8081, debug=True)
