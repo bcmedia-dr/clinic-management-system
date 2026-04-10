@@ -1000,6 +1000,32 @@
         </div>
     </div>
 
+    <!-- 合併診所 Modal -->
+    <div class="modal" id="mergeModal" style="display:none;">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2>🔗 合併重複診所</h2>
+                <button class="close-btn" onclick="document.getElementById('mergeModal').style.display='none'">&times;</button>
+            </div>
+            <p style="color:#666;font-size:13px;margin-bottom:16px;">選擇要保留的診所，另一筆資料將被刪除。缺少的欄位會自動從被刪除的診所補齊，活動記錄也會一併轉移。</p>
+            <div style="display:flex;gap:12px;margin-bottom:20px;">
+                <div id="mergeOptionA" data-id=""
+                     onclick="selectMergeKeep('A')"
+                     style="flex:1;border:2px solid #ddd;border-radius:8px;padding:14px;cursor:pointer;transition:border-color .2s;">
+                </div>
+                <div id="mergeOptionB" data-id=""
+                     onclick="selectMergeKeep('B')"
+                     style="flex:1;border:2px solid #ddd;border-radius:8px;padding:14px;cursor:pointer;transition:border-color .2s;">
+                </div>
+            </div>
+            <input type="hidden" id="mergeKeep" value="A">
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="document.getElementById('mergeModal').style.display='none'">取消</button>
+                <button class="btn btn-primary" onclick="confirmMerge()">確認合併</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 批次編輯 Modal -->
     <div class="modal" id="batchEditModal" style="display:none;">
         <div class="modal-content" style="max-width:500px;">
@@ -1957,11 +1983,18 @@
         }
 
         function renderDupGroup(groupLabel, clinics, showName) {
-            // 渲染單一重複組（每筆顯示名稱、縣市/區域、電話、刪除按鈕）
+            const mergeBtn = clinics.length === 2
+                ? `<button onclick="showMergeModal(${clinics[0].id},'${clinics[0].name.replace(/'/g,"\\'")}',${clinics[1].id},'${clinics[1].name.replace(/'/g,"\\'")}',
+                        '${clinics[0].region}${clinics[0].district}','${clinics[0].phone || ''}',
+                        '${clinics[1].region}${clinics[1].district}','${clinics[1].phone || ''}')"
+                   style="background:#8b5cf6;color:white;border:none;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:13px;margin-left:10px;">
+                   🔗 合併</button>`
+                : '';
             let html = `<div style="border:1px solid #eee;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-                <div style="font-weight:600;color:#333;margin-bottom:8px;">
+                <div style="font-weight:600;color:#333;margin-bottom:8px;display:flex;align-items:center;">
                     ${groupLabel}
-                    <span style="color:#999;font-size:13px;font-weight:400;">（共 ${clinics.length} 筆）</span>
+                    <span style="color:#999;font-size:13px;font-weight:400;margin-left:6px;">（共 ${clinics.length} 筆）</span>
+                    ${mergeBtn}
                 </div>`;
             clinics.forEach(c => {
                 html += `<div style="display:flex;align-items:center;justify-content:space-between;
@@ -1981,6 +2014,52 @@
             });
             html += '</div>';
             return html;
+        }
+
+        // 合併 Modal
+        function showMergeModal(idA, nameA, idB, nameB, locationA, phoneA, locationB, phoneB) {
+            document.getElementById('mergeModal').style.display = 'flex';
+            document.getElementById('mergeOptionA').innerHTML =
+                `<strong>${nameA}</strong><br><span style="font-size:13px;color:#777;">${locationA}　${phoneA || '無電話'}</span><br><span style="font-size:12px;color:#aaa;">id:${idA}</span>`;
+            document.getElementById('mergeOptionB').innerHTML =
+                `<strong>${nameB}</strong><br><span style="font-size:13px;color:#777;">${locationB}　${phoneB || '無電話'}</span><br><span style="font-size:12px;color:#aaa;">id:${idB}</span>`;
+            document.getElementById('mergeOptionA').dataset.id = idA;
+            document.getElementById('mergeOptionB').dataset.id = idB;
+            // 預設選 A
+            selectMergeKeep('A');
+        }
+
+        function selectMergeKeep(which) {
+            const a = document.getElementById('mergeOptionA');
+            const b = document.getElementById('mergeOptionB');
+            if (which === 'A') {
+                a.style.border = '2px solid #8b5cf6'; a.style.background = '#f5f3ff';
+                b.style.border = '2px solid #eee';    b.style.background = '#fff';
+                document.getElementById('mergeKeep').value = 'A';
+            } else {
+                b.style.border = '2px solid #8b5cf6'; b.style.background = '#f5f3ff';
+                a.style.border = '2px solid #eee';    a.style.background = '#fff';
+                document.getElementById('mergeKeep').value = 'B';
+            }
+        }
+
+        async function confirmMerge() {
+            const which  = document.getElementById('mergeKeep').value;
+            const keepId   = parseInt(document.getElementById(which === 'A' ? 'mergeOptionA' : 'mergeOptionB').dataset.id);
+            const deleteId = parseInt(document.getElementById(which === 'A' ? 'mergeOptionB' : 'mergeOptionA').dataset.id);
+            const res = await fetch('/api/clinics/merge', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({keep_id: keepId, delete_id: deleteId})
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('mergeModal').style.display = 'none';
+                loadDuplicates();
+                loadClinics();
+            } else {
+                alert('合併失敗：' + (data.error || '未知錯誤'));
+            }
         }
 
         function renderDuplicates(data) {
