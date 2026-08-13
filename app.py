@@ -1,10 +1,12 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sqlalchemy import text, func, case
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, date
-import os, re, math, hmac
+import os, re, math, hmac, secrets
 from collections import Counter
 from io import BytesIO
 from openpyxl import Workbook, load_workbook
@@ -16,7 +18,14 @@ from import_custom import import_custom_clinics
 from phone_utils import format_phone, normalize_specialty, STANDARD_SPECIALTIES
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'fallback-only-for-local')
+# SECRET_KEY：正式環境從環境變數讀取；若未設定則產生隨機值（不使用可被猜測的固定字串）
+app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+
+# Session cookie 安全旗標
+IS_PROD = os.environ.get('RENDER') == 'true'
+app.config['SESSION_COOKIE_HTTPONLY'] = True          # 禁止 JavaScript 讀取 cookie
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'         # 降低 CSRF 風險
+app.config['SESSION_COOKIE_SECURE'] = IS_PROD         # 正式環境（HTTPS）才要求 Secure，本地開發不影響
 
 # 資料庫設定
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///clinics.db')
@@ -28,6 +37,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB 上傳限制
 
 db = SQLAlchemy(app)
+
+# 登入速率限制（避免暴力猜密碼）
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({'error': '登入嘗試次數過多，請稍後再試'}), 429
 
 
 @app.errorhandler(413)
@@ -209,6 +225,7 @@ def campaign_match_page():
     return render_template('campaign_match.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute", methods=['POST'])
 def login():
     if request.method == 'POST':
         data = request.get_json()
@@ -2528,23 +2545,27 @@ with app.app_context():
             with db.engine.connect() as _conn:
                 _conn.execute(text(_sql))
                 _conn.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            # 不再靜默吞掉，記錄下來以便發現失敗的 migration
+            print(f"[migration] 執行失敗：{_sql[:60]}... -> {e}")
 
     # 一次性修正：補上 baiwei_doctor 電話區碼（phone 不以 '0' 開頭的記錄）
-    try:
-        _docs_to_fix = BaiweiDoctor.query.filter(
-            BaiweiDoctor.phone.isnot(None),
-            ~BaiweiDoctor.phone.like('0%')
-        ).all()
-        for _d in _docs_to_fix:
-            _new_phone = format_phone(_d.phone, _d.region or None)
-            if _new_phone != _d.phone:
-                _d.phone = _new_phone
-        if _docs_to_fix:
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # 已為「一次性」修正，預設不在每次開機執行；需要時設環境變數 RUN_ONE_TIME_FIXES=true 觸發
+    if os.environ.get('RUN_ONE_TIME_FIXES') == 'true':
+        try:
+            _docs_to_fix = BaiweiDoctor.query.filter(
+                BaiweiDoctor.phone.isnot(None),
+                ~BaiweiDoctor.phone.like('0%')
+            ).all()
+            for _d in _docs_to_fix:
+                _new_phone = format_phone(_d.phone, _d.region or None)
+                if _new_phone != _d.phone:
+                    _d.phone = _new_phone
+            if _docs_to_fix:
+                db.session.commit()
+        except Exception as e:
+            print(f"[one-time-fix] 失敗：{e}")
+            db.session.rollback()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8081, debug=True)
