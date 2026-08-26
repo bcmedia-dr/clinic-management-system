@@ -6,7 +6,7 @@ from sqlalchemy import text, func, case
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, date
-import os, re, math, hmac, secrets
+import os, re, math, hmac, secrets, tempfile
 from collections import Counter
 from io import BytesIO
 from openpyxl import Workbook, load_workbook
@@ -18,14 +18,20 @@ from import_custom import import_custom_clinics
 from phone_utils import format_phone, normalize_specialty, STANDARD_SPECIALTIES
 
 app = Flask(__name__)
-# SECRET_KEY：正式環境從環境變數讀取；若未設定則產生隨機值（不使用可被猜測的固定字串）
-app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+IS_PROD = os.environ.get('RENDER') == 'true'
+_secret_key = os.environ.get('SECRET_KEY')
+if IS_PROD and not _secret_key:
+    raise RuntimeError('SECRET_KEY must be configured in production')
+app.secret_key = _secret_key or secrets.token_hex(32)
 
 # Session cookie 安全旗標
-IS_PROD = os.environ.get('RENDER') == 'true'
 app.config['SESSION_COOKIE_HTTPONLY'] = True          # 禁止 JavaScript 讀取 cookie
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'         # 降低 CSRF 風險
 app.config['SESSION_COOKIE_SECURE'] = IS_PROD         # 正式環境（HTTPS）才要求 Secure，本地開發不影響
+app.config['SESSION_COOKIE_NAME'] = 'clinic_session'
+app.config['PERMANENT_SESSION_LIFETIME'] = 8 * 60 * 60
+if IS_PROD:
+    app.config['TRUSTED_HOSTS'] = ['clinic-management-system-87nh.onrender.com']
 
 # 資料庫設定
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///clinics.db')
@@ -41,6 +47,63 @@ db = SQLAlchemy(app)
 # 登入速率限制（避免暴力猜密碼）
 limiter = Limiter(get_remote_address, app=app, default_limits=[])
 
+_PUBLIC_ENDPOINTS = {'login', 'static'}
+_UNSAFE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+
+
+def _get_csrf_token():
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['_csrf_token'] = token
+    return token
+
+
+@app.context_processor
+def inject_security_context():
+    return {'csrf_token': _get_csrf_token()}
+
+
+@app.before_request
+def enforce_authentication_and_csrf():
+    """Private-by-default: only login and static assets are public."""
+    if request.endpoint in _PUBLIC_ENDPOINTS or request.method == 'OPTIONS':
+        return None
+
+    if 'user' not in session:
+        if request.path.startswith('/api/'):
+            return jsonify({'error': '未登入'}), 401
+        return redirect(url_for('login'))
+
+    if request.method in _UNSAFE_METHODS:
+        expected = session.get('_csrf_token', '')
+        supplied = request.headers.get('X-CSRF-Token', '')
+        if not expected or not supplied or not hmac.compare_digest(supplied, expected):
+            return jsonify({'error': 'CSRF 驗證失敗，請重新整理頁面後再試'}), 403
+
+    return None
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+        "form-action 'self'; img-src 'self' data:; connect-src 'self'; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net"
+    )
+    if IS_PROD:
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    if 'user' in session or request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return jsonify({'error': '登入嘗試次數過多，請稍後再試'}), 429
@@ -49,6 +112,16 @@ def ratelimit_handler(e):
 @app.errorhandler(413)
 def file_too_large(e):
     return jsonify({'success': False, 'error': '檔案過大，最大允許 10MB'}), 413
+
+
+def _save_upload_to_unique_temp(file_storage):
+    """Save an upload to a collision-resistant temporary file."""
+    safe_name = secure_filename(file_storage.filename or 'upload.xlsx')
+    suffix = os.path.splitext(safe_name)[1].lower() or '.xlsx'
+    fd, temp_path = tempfile.mkstemp(prefix='clinic_upload_', suffix=suffix)
+    os.close(fd)
+    file_storage.save(temp_path)
+    return temp_path
 
 
 # ── 資料模型 ─────────────────────────────────────────────────
@@ -228,29 +301,35 @@ def campaign_match_page():
 @limiter.limit("5 per minute", methods=['POST'])
 def login():
     if request.method == 'POST':
-        data = request.get_json()
-        username = data.get('username', '')
-        password = data.get('password', '')
+        data = request.get_json(silent=True) or {}
+        username = str(data.get('username') or '')
+        password = str(data.get('password') or '')
         admin_password = os.environ.get('ADMIN_PASSWORD', '')
         user_password  = os.environ.get('USER_PASSWORD', '')
         if not admin_password or not user_password:
             return jsonify({'error': '系統設定錯誤，請聯絡管理員'}), 500
         if username == 'admin' and hmac.compare_digest(password, admin_password):
+            session.clear()
             session['user'] = 'admin'
             session['role'] = 'admin'
+            session['_csrf_token'] = secrets.token_urlsafe(32)
+            session.permanent = True
             return jsonify({'success': True})
         elif username == 'user' and hmac.compare_digest(password, user_password):
+            session.clear()
             session['user'] = 'user'
             session['role'] = 'user'
+            session['_csrf_token'] = secrets.token_urlsafe(32)
+            session.permanent = True
             return jsonify({'success': True})
         else:
             return jsonify({'error': '帳號或密碼錯誤'}), 401
     return render_template('login.html')
 
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return jsonify({'success': True})
 
 @app.route('/audit-log')
 def audit_log_page():
@@ -391,7 +470,8 @@ def create_clinic():
         return jsonify({'success': True, 'id': clinic.id})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'儲存失敗: {str(e)}'}), 500
+        app.logger.exception('Failed to create clinic')
+        return jsonify({'error': '儲存失敗，請稍後再試'}), 500
 
 @app.route('/api/clinics/<int:clinic_id>', methods=['PUT'])
 def update_clinic(clinic_id):
@@ -423,7 +503,8 @@ def update_clinic(clinic_id):
         return jsonify({'error': '此電話號碼已有其他診所使用，請確認是否為重複診所'}), 409
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'更新失敗: {str(e)}'}), 500
+        app.logger.exception('Failed to update clinic')
+        return jsonify({'error': '更新失敗，請稍後再試'}), 500
 
 @app.route('/api/clinics/batch-edit', methods=['PUT'])
 def batch_edit_clinics():
@@ -465,7 +546,8 @@ def batch_edit_clinics():
         return jsonify({'success': True, 'updated': updated})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'批次編輯失敗: {str(e)}'}), 500
+        app.logger.exception('Failed to batch update clinics')
+        return jsonify({'error': '批次編輯失敗，請稍後再試'}), 500
 
 
 @app.route('/api/clinics/<int:clinic_id>', methods=['DELETE'])
@@ -510,7 +592,8 @@ def permanent_delete_clinic(clinic_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'刪除失敗: {str(e)}'}), 500
+        app.logger.exception('Failed to permanently delete clinic')
+        return jsonify({'error': '刪除失敗，請稍後再試'}), 500
 
 
 @app.route('/api/clinics/deleted', methods=['GET'])
@@ -707,7 +790,8 @@ def merge_clinics():
             db.session.rollback()
         except Exception:
             pass
-        return jsonify({'error': str(e)}), 500
+        app.logger.exception('Failed to merge clinics')
+        return jsonify({'error': '合併失敗，請稍後再試'}), 500
 
 
 @app.route('/api/specialties')
@@ -820,7 +904,8 @@ def create_health_mall():
         return jsonify({'success': True, 'id': hm.id})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'儲存失敗: {str(e)}'}), 500
+        app.logger.exception('Failed to create health mall clinic')
+        return jsonify({'error': '儲存失敗，請稍後再試'}), 500
 
 @app.route('/api/health-mall/<int:hm_id>', methods=['PUT'])
 def update_health_mall(hm_id):
@@ -846,7 +931,8 @@ def update_health_mall(hm_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'更新失敗: {str(e)}'}), 500
+        app.logger.exception('Failed to update health mall clinic')
+        return jsonify({'error': '更新失敗，請稍後再試'}), 500
 
 @app.route('/api/health-mall/<int:hm_id>', methods=['DELETE'])
 def delete_health_mall(hm_id):
@@ -1091,13 +1177,14 @@ def import_data():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
-    filename = secure_filename(file.filename)
-    temp_path = os.path.join('/tmp', filename)
-    file.save(temp_path)
+    temp_path = _save_upload_to_unique_temp(file)
     dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
-    with app.app_context():
-        result = import_clinics(temp_path, db, Clinic, dry_run=dry_run)
-    os.remove(temp_path)
+    try:
+        with app.app_context():
+            result = import_clinics(temp_path, db, Clinic, dry_run=dry_run)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
     return jsonify(result)
 
 @app.route('/api/import-custom', methods=['POST'])
@@ -1112,13 +1199,14 @@ def import_custom_data():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
-    filename = secure_filename(file.filename)
-    temp_path = os.path.join('/tmp', filename)
-    file.save(temp_path)
+    temp_path = _save_upload_to_unique_temp(file)
     dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
-    with app.app_context():
-        result = import_custom_clinics(temp_path, db, Clinic, dry_run=dry_run)
-    os.remove(temp_path)
+    try:
+        with app.app_context():
+            result = import_custom_clinics(temp_path, db, Clinic, dry_run=dry_run)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
     return jsonify(result)
 
 @app.route('/api/health-mall/import', methods=['POST'])
@@ -1133,13 +1221,14 @@ def import_health_mall_data():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
-    filename = secure_filename(file.filename)
-    temp_path = os.path.join('/tmp', filename)
-    file.save(temp_path)
+    temp_path = _save_upload_to_unique_temp(file)
     dry_run = request.args.get('dry_run') == 'true'  # ?dry_run=true 時進入預覽模式
-    with app.app_context():
-        result = import_health_mall(temp_path, db, HealthMall, dry_run=dry_run)
-    os.remove(temp_path)
+    try:
+        with app.app_context():
+            result = import_health_mall(temp_path, db, HealthMall, dry_run=dry_run)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
     return jsonify(result)
 
 
@@ -1154,9 +1243,7 @@ def campaign_match():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
-    filename = secure_filename(file.filename)
-    temp_path = os.path.join('/tmp', filename)
-    file.save(temp_path)
+    temp_path = _save_upload_to_unique_temp(file)
 
     try:
         wb = load_workbook(temp_path)
@@ -1271,7 +1358,8 @@ def campaign_match():
     except Exception as e:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        return jsonify({'error': f'比對失敗: {str(e)}'}), 500
+        app.logger.exception('Campaign match failed')
+        return jsonify({'error': '比對失敗，請確認檔案格式後再試'}), 500
 
 
 @app.route('/api/campaign/match-history', methods=['GET'])
@@ -1494,27 +1582,20 @@ def update_campaign_clinic(campaign_id, clinic_id):
 
 @app.route('/api/campaigns/<int:campaign_id>/import', methods=['POST'])
 def import_campaign_clinics(campaign_id):
-    print(f"[DEBUG] campaign_import called, campaign_id={campaign_id}, dry_run={request.args.get('dry_run')}, files={list(request.files.keys())}", flush=True)
     if session.get('role') != 'admin':
-        print(f"[DEBUG] returning 403 権限不足", flush=True)
         return jsonify({'error': '權限不足'}), 403
     campaign = Campaign.query.get_or_404(campaign_id)
     if 'file' not in request.files:
-        print(f"[DEBUG] returning 400 沒有上傳檔案", flush=True)
         return jsonify({'error': '沒有上傳檔案'}), 400
     file = request.files['file']
     if not file.filename.endswith('.xlsx'):
-        print(f"[DEBUG] returning 400 非xlsx, filename={file.filename}", flush=True)
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
-    filename  = secure_filename(file.filename)
-    temp_path = os.path.join('/tmp', filename)
+    temp_path = None
 
     try:
-        file.save(temp_path)
-        print(f"[DEBUG] file saved to {temp_path}", flush=True)
+        temp_path = _save_upload_to_unique_temp(file)
         wb = load_workbook(temp_path, read_only=True, data_only=True)
-        print(f"[DEBUG] workbook loaded (read_only)", flush=True)
         ws = wb.active
         os.remove(temp_path)
 
@@ -1534,7 +1615,6 @@ def import_campaign_clinics(campaign_id):
 
         if header_row_idx is None:
             wb.close()
-            print(f"[DEBUG] returning 400 找不到標題行, preview={preview_rows}", flush=True)
             return jsonify({
                 'error': '找不到含「電話」的標題行（掃描前 5 行）',
                 'debug_preview': preview_rows,
@@ -1673,13 +1753,11 @@ def import_campaign_clinics(campaign_id):
 
         # dry_run 模式：rollback 確保不寫入，回傳預覽結果
         if dry_run:
-            print(f"[DEBUG] dry_run returning: would_create={new_clinics_count}, would_update={updated_count}, would_skip={already_in_campaign}, errors={len(errors)}, preview={len(preview_create+preview_update)}", flush=True)
             wb.close()
             try:
                 db.session.rollback()
             except Exception:
                 pass
-            print(f"[DEBUG] dry_run rollback done, sending jsonify response", flush=True)
             return jsonify({
                 'dry_run':             True,
                 'would_create':        new_clinics_count,
@@ -1689,7 +1767,6 @@ def import_campaign_clinics(campaign_id):
                 'preview':             preview_create + preview_update,
             })
 
-        print(f"[DEBUG] commit returning: new={new_clinics_count}, updated={updated_count}, recorded={recorded}, skip={already_in_campaign}, errors={len(errors)}", flush=True)
         wb.close()
         db.session.commit()
         return jsonify({
@@ -1705,9 +1782,7 @@ def import_campaign_clinics(campaign_id):
         })
 
     except Exception as e:
-        import traceback
-        print(f"[DEBUG] exception caught: {type(e).__name__}: {e}", flush=True)
-        print(f"[DEBUG] traceback: {traceback.format_exc()}", flush=True)
+        app.logger.exception('Campaign clinic import failed')
         try:
             wb.close()
         except Exception:
@@ -1718,7 +1793,7 @@ def import_campaign_clinics(campaign_id):
             db.session.rollback()
         except Exception:
             pass
-        return jsonify({'success': False, 'error': f'匯入失敗: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': '匯入失敗，請確認檔案格式後再試'}), 500
 
 @app.route('/api/campaigns/<int:campaign_id>/clinics/all', methods=['DELETE'])
 def clear_campaign_clinics(campaign_id):
@@ -1845,9 +1920,7 @@ def import_baiwei():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
-    filename  = secure_filename(file.filename)
-    temp_path = os.path.join('/tmp', filename)
-    file.save(temp_path)
+    temp_path = _save_upload_to_unique_temp(file)
 
     try:
         wb = load_workbook(temp_path)
@@ -1995,7 +2068,8 @@ def import_baiwei():
         if os.path.exists(temp_path):
             os.remove(temp_path)
         db.session.rollback()
-        return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
+        app.logger.exception('Baiwei import failed')
+        return jsonify({'error': '匯入失敗，請確認檔案格式後再試'}), 500
 
 
 @app.route('/api/baiwei/duplicates', methods=['GET'])
@@ -2288,9 +2362,7 @@ def import_baiwei_campaign(campaign_id):
     if not file.filename.endswith('.xlsx'):
         return jsonify({'error': '只接受 .xlsx 格式'}), 400
 
-    filename  = secure_filename(file.filename)
-    temp_path = os.path.join('/tmp', filename)
-    file.save(temp_path)
+    temp_path = _save_upload_to_unique_temp(file)
 
     try:
         wb = load_workbook(temp_path, read_only=True, data_only=True)
@@ -2432,7 +2504,8 @@ def import_baiwei_campaign(campaign_id):
         if os.path.exists(temp_path):
             os.remove(temp_path)
         db.session.rollback()
-        return jsonify({'error': f'匯入失敗: {str(e)}'}), 500
+        app.logger.exception('Baiwei campaign import failed')
+        return jsonify({'error': '匯入失敗，請確認檔案格式後再試'}), 500
 
 
 # ── 工具函式 ─────────────────────────────────────────────────

@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <script src="{{ url_for('static', filename='security.js') }}"></script>
     <title>健康醫購 - Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -665,24 +667,24 @@
                 const rowNum = start + idx + 1;
 
                 const specialties = c.specialties
-                    ? c.specialties.split(',').map(s => `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
+                    ? c.specialties.split(',').map(s => `<span class="specialty-tag">${Security.escapeHtml(s.trim())}</span>`).join(' ')
                     : '';
 
                 const statusMap = { '合作中': 'active', '暫停': 'paused', '結束': 'ended' };
                 const statusClass = statusMap[c.health_mall_status] || 'ended';
-                const statusTag = `<span class="status-tag ${statusClass}">${c.health_mall_status}</span>`;
+                const statusTag = `<span class="status-tag ${statusClass}">${Security.escapeHtml(c.health_mall_status || '')}</span>`;
 
                 const row = document.createElement('tr');
                 row.setAttribute('data-clinic-id', c.id);
                 row.innerHTML = `
                     <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${c.id}"></td>
                     <td>${rowNum}</td>
-                    <td>${c.region || ''}</td>
-                    <td>${c.district || ''}</td>
-                    <td title="${c.name}">${c.name}</td>
+                    <td>${Security.escapeHtml(c.region || '')}</td>
+                    <td>${Security.escapeHtml(c.district || '')}</td>
+                    <td title="${Security.escapeHtml(c.name || '')}">${Security.escapeHtml(c.name || '')}</td>
                     <td>${specialties}</td>
-                    <td>${c.phone || ''}</td>
-                    <td>${c.contact_person || ''}</td>
+                    <td>${Security.escapeHtml(c.phone || '')}</td>
+                    <td>${Security.escapeHtml(c.contact_person || '')}</td>
                     <td>${statusTag}</td>
                     <td>
                         <button class="btn-edit" onclick="editClinic(${c.id})">編輯</button>
@@ -860,8 +862,8 @@
                 } else {
                     resultsDiv.innerHTML = _pickerCache.map((c, i) => `
                         <div class="picker-item" onclick="selectClinic(${i})">
-                            <div class="picker-item-name">${c.name}</div>
-                            <div class="picker-item-meta">${c.region}${c.district} ｜ ${c.phone}</div>
+                            <div class="picker-item-name">${Security.escapeHtml(c.name || '')}</div>
+                            <div class="picker-item-meta">${Security.escapeHtml(c.region || '')}${Security.escapeHtml(c.district || '')} ｜ ${Security.escapeHtml(c.phone || '')}</div>
                         </div>
                     `).join('');
                 }
@@ -918,7 +920,7 @@
 
         function closeModal() { document.getElementById('hmModal').style.display = 'none'; clearFormErrors(); }
 
-        function logout() { window.location.href = '/logout'; }
+        function logout() { secureLogout(); }
 
         function exportData() {
             const f = getFilters();
@@ -953,7 +955,7 @@
             if (errCount > 0) {
                 html += `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:12px;">
                     <strong>⚠️ 錯誤 ${errCount} 筆</strong><br>
-                    ${errList.slice(0, 5).join('<br>')}
+                    ${errList.slice(0, 5).map(Security.escapeHtml).join('<br>')}
                     ${errList.length > 5 ? `<br>...等 ${errList.length - 5} 筆` : ''}
                 </div>`;
             }
@@ -961,7 +963,7 @@
             if (warnList.length > 0) {
                 html += `<div style="background:#e8f4fd;border:1px solid #bee3f8;border-radius:8px;padding:12px;margin-bottom:12px;">
                     <strong>ℹ️ 注意事項 ${warnList.length} 筆</strong><br>
-                    ${warnList.slice(0, 5).join('<br>')}
+                    ${warnList.slice(0, 5).map(Security.escapeHtml).join('<br>')}
                     ${warnList.length > 5 ? `<br>...等 ${warnList.length - 5} 筆` : ''}
                 </div>`;
             }
@@ -978,10 +980,10 @@
                     </tr></thead>
                     <tbody>
                     ${result.preview.map(p => `<tr style="border-top:1px solid #f0f0f0;">
-                        <td style="padding:7px 10px;">${p.name || '-'}</td>
-                        <td style="padding:7px 10px;">${p.phone || '-'}</td>
-                        <td style="padding:7px 10px;">${p.region || '-'}</td>
-                        <td style="padding:7px 10px;"><span style="background:${actionBg[p.action]||'#eee'};color:${actionColor[p.action]||'#333'};padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;">${actionLabel[p.action] || p.action}</span></td>
+                        <td style="padding:7px 10px;">${Security.escapeHtml(p.name || '-')}</td>
+                        <td style="padding:7px 10px;">${Security.escapeHtml(p.phone || '-')}</td>
+                        <td style="padding:7px 10px;">${Security.escapeHtml(p.region || '-')}</td>
+                        <td style="padding:7px 10px;"><span style="background:${actionBg[p.action]||'#eee'};color:${actionColor[p.action]||'#333'};padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;">${Security.escapeHtml(actionLabel[p.action] || p.action || '')}</span></td>
                     </tr>`).join('')}
                     </tbody>
                 </table>
@@ -1030,18 +1032,18 @@
 
                 if (result.success) {
                     let skippedHtml = result.skipped > 0
-                        ? `<br><br>⚠️ 跳過 ${result.skipped} 筆（電話重複）：<br>${result.skipped_names.join('、')}` : '';
+                        ? `<br><br>⚠️ 跳過 ${result.skipped} 筆（電話重複）：<br>${(result.skipped_names || []).map(Security.escapeHtml).join('、')}` : '';
                     const warnHtml = (result.warnings && result.warnings.length > 0)
-                        ? `<br><br>ℹ️ 注意事項：<br>${result.warnings.join('<br>')}` : '';
+                        ? `<br><br>ℹ️ 注意事項：<br>${result.warnings.map(Security.escapeHtml).join('<br>')}` : '';
                     resultDiv.innerHTML = `<div style="background:#d4edda;color:#155724;padding:15px;border-radius:8px;">
                         <strong>✅ 匯入完成</strong><br>新增 ${result.imported} 筆${skippedHtml}${warnHtml}
-                        ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
+                        ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.map(Security.escapeHtml).join('<br>') : ''}
                     </div>`;
                     resultDiv.style.display = 'block';
                     setTimeout(() => { closeImportModal(); loadStats(); loadClinics(); }, 2000);
                 } else {
                     resultDiv.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">
-                        <strong>❌ 匯入失敗</strong><br>${result.error}
+                        <strong>❌ 匯入失敗</strong><br>${Security.escapeHtml(result.error || '未知錯誤')}
                     </div>`;
                     resultDiv.style.display = 'block';
                 }

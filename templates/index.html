@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <script src="{{ url_for('static', filename='security.js') }}"></script>
     <title>Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -1328,9 +1330,11 @@
         }
 
         function highlightText(text, query) {
-            if (!query || !text) return text || '';
-            const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            return text.replace(new RegExp('(' + escaped + ')', 'gi'), '<mark class="hl">$1</mark>');
+            const safeText = Security.escapeHtml(text || '');
+            if (!query || !text) return safeText;
+            const safeQuery = Security.escapeHtml(query);
+            const escaped = safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return safeText.replace(new RegExp('(' + escaped + ')', 'gi'), '<mark class="hl">$1</mark>');
         }
 
         function renderClinics(clinics, total, page, totalPages) {
@@ -1351,7 +1355,7 @@
                 const rowNum = start + index + 1;
 
                 const specialties = clinic.specialties
-                    ? clinic.specialties.split(',').map(s => `<span class="specialty-tag">${s.trim()}</span>`).join(' ')
+                    ? clinic.specialties.split(',').map(s => `<span class="specialty-tag">${Security.escapeHtml(s.trim())}</span>`).join(' ')
                     : '';
 
                 const colTags = [];
@@ -1366,9 +1370,9 @@
                 row.innerHTML = `
                     <td><input type="checkbox" class="checkbox-select clinic-checkbox" data-clinic-id="${clinic.id}"></td>
                     <td>${rowNum}</td>
-                    <td>${clinic.region || ''}</td>
-                    <td>${clinic.district || ''}</td>
-                    <td title="${clinic.name}">${highlightText(clinic.name, _q)}</td>
+                    <td>${Security.escapeHtml(clinic.region || '')}</td>
+                    <td>${Security.escapeHtml(clinic.district || '')}</td>
+                    <td title="${Security.escapeHtml(clinic.name)}">${highlightText(clinic.name, _q)}</td>
                     <td>${specialties}</td>
                     <td>${highlightText(clinic.phone || '', _q)}</td>
                     <td>${highlightText(clinic.contact_person || '', _q)}</td>
@@ -1390,15 +1394,15 @@
                             <div class="detail-info">
                                 <div class="detail-item">
                                     <label>地址</label>
-                                    <span>${clinic.address || '未設定'}</span>
+                                    <span>${Security.escapeHtml(clinic.address || '未設定')}</span>
                                 </div>
                                 <div class="detail-item">
                                     <label>營業時間</label>
-                                    <span>${clinic.business_hours || '未設定'}</span>
+                                    <span>${Security.escapeHtml(clinic.business_hours || '未設定')}</span>
                                 </div>
                                 <div class="detail-item">
                                     <label>備註</label>
-                                    <span>${clinic.note || '無備註'}</span>
+                                    <span>${Security.escapeHtml(clinic.note || '無備註')}</span>
                                 </div>
                                 <div class="detail-item" style="grid-column:1/-1;">
                                     <label>活動記錄</label>
@@ -1455,9 +1459,9 @@
                                 </tr></thead>
                                 <tbody>${campaigns.map(c => `
                                     <tr>
-                                        <td style="padding:5px 14px;font-size:13px;">${c.campaign_name}</td>
-                                        <td style="padding:5px 14px;font-size:13px;">${c.year || '-'}</td>
-                                        <td style="padding:5px 14px;font-size:13px;">${c.campaign_date || '-'}</td>
+                                        <td style="padding:5px 14px;font-size:13px;">${Security.escapeHtml(c.campaign_name)}</td>
+                                        <td style="padding:5px 14px;font-size:13px;">${Security.escapeHtml(c.year || '-')}</td>
+                                        <td style="padding:5px 14px;font-size:13px;">${Security.escapeHtml(c.campaign_date || '-')}</td>
                                     </tr>`).join('')}
                                 </tbody>
                             </table>`;
@@ -1633,7 +1637,7 @@
         }
 
         function logout() {
-            window.location.href = '/logout';
+            secureLogout();
         }
 
         window.onclick = function(event) {
@@ -1695,7 +1699,7 @@
             if (errCount > 0) {
                 html += `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:12px;">
                     <strong>⚠️ 錯誤 ${errCount} 筆</strong><br>
-                    ${errList.slice(0, 5).join('<br>')}
+                    ${errList.slice(0, 5).map(Security.escapeHtml).join('<br>')}
                     ${errList.length > 5 ? `<br>...等 ${errList.length - 5} 筆` : ''}
                 </div>`;
             }
@@ -1714,13 +1718,13 @@
                     </tr></thead>
                     <tbody>
                     ${result.preview.map(p => `<tr style="border-top:1px solid #f0f0f0;">
-                        <td style="padding:7px 10px;">${p.name || '-'}</td>
-                        <td style="padding:7px 10px;">${p.phone || '-'}</td>
-                        <td style="padding:7px 10px;">${p.region || '-'}</td>
+                        <td style="padding:7px 10px;">${Security.escapeHtml(p.name || '-')}</td>
+                        <td style="padding:7px 10px;">${Security.escapeHtml(p.phone || '-')}</td>
+                        <td style="padding:7px 10px;">${Security.escapeHtml(p.region || '-')}</td>
                         <td style="padding:7px 10px;">
                             <span style="background:${actionBg[p.action]||'#eee'};color:${actionColor[p.action]||'#333'};
                                          padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;">
-                                ${actionLabel[p.action] || p.action}
+                                ${Security.escapeHtml(actionLabel[p.action] || p.action)}
                             </span>
                         </td>
                     </tr>`).join('')}
@@ -1781,13 +1785,13 @@
                     let updatedHtml = result.updated > 0 ? `<br>更新 ${result.updated} 筆（電話已存在）` : '';
                     resultDiv.innerHTML = `<div style="background:#d4edda;color:#155724;padding:15px;border-radius:8px;">
                         <strong>✅ 匯入完成</strong><br>新增 ${result.imported} 筆${updatedHtml}
-                        ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.join('<br>') : ''}
+                        ${result.errors.length > 0 ? '<br><br>錯誤：<br>' + result.errors.map(Security.escapeHtml).join('<br>') : ''}
                     </div>`;
                     resultDiv.style.display = 'block';
                     setTimeout(() => { closeImportModal(); loadClinics(); loadStats(); }, 2000);
                 } else {
                     resultDiv.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">
-                        <strong>❌ 匯入失敗</strong><br>${result.error}
+                        <strong>❌ 匯入失敗</strong><br>${Security.escapeHtml(result.error || '未知錯誤')}
                     </div>`;
                     resultDiv.style.display = 'block';
                 }
@@ -1845,7 +1849,7 @@
                 if (result.success) {
                     let updatedHtml = result.updated > 0 ? `<br>更新 ${result.updated} 筆（電話已存在）` : '';
                     let errorHtml = result.errors > 0
-                        ? `<br><br>❌ 錯誤 ${result.errors} 筆：<br>${result.error_details.join('<br>')}` : '';
+                        ? `<br><br>❌ 錯誤 ${result.errors} 筆：<br>${(result.error_details || []).map(Security.escapeHtml).join('<br>')}` : '';
                     resultDiv.innerHTML = `<div style="background:#d4edda;color:#155724;padding:15px;border-radius:8px;">
                         <strong>✅ 匯入完成</strong><br>新增 ${result.imported} 筆${updatedHtml}${errorHtml}
                     </div>`;
@@ -1853,7 +1857,7 @@
                     setTimeout(() => { closeCustomImportModal(); loadClinics(); loadStats(); }, 2500);
                 } else {
                     resultDiv.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">
-                        <strong>❌ 匯入失敗</strong><br>${result.error}
+                        <strong>❌ 匯入失敗</strong><br>${Security.escapeHtml(result.error || '未知錯誤')}
                     </div>`;
                     resultDiv.style.display = 'block';
                 }
@@ -1879,7 +1883,7 @@
                 const clinics = await res.json();
                 renderDeletedClinics(clinics);
             } catch(e) {
-                content.innerHTML = `<p style="color:red;text-align:center;padding:20px;">載入失敗：${e.message}</p>`;
+                content.innerHTML = `<p style="color:red;text-align:center;padding:20px;">載入失敗：${Security.escapeHtml(e.message)}</p>`;
             }
         }
 
@@ -1902,18 +1906,18 @@
                 <tbody>`;
             clinics.forEach(c => {
                 html += `<tr style="border-top:1px solid #f0f0f0;">
-                    <td style="padding:10px;">${c.region || '-'}</td>
-                    <td style="padding:10px;">${c.district || '-'}</td>
-                    <td style="padding:10px;font-weight:600;">${c.name}</td>
-                    <td style="padding:10px;">${c.phone || '-'}</td>
-                    <td style="padding:10px;">${c.specialties || '-'}</td>
-                    <td style="padding:10px;color:#999;font-size:13px;">${c.deleted_at}</td>
+                    <td style="padding:10px;">${Security.escapeHtml(c.region || '-')}</td>
+                    <td style="padding:10px;">${Security.escapeHtml(c.district || '-')}</td>
+                    <td style="padding:10px;font-weight:600;">${Security.escapeHtml(c.name)}</td>
+                    <td style="padding:10px;">${Security.escapeHtml(c.phone || '-')}</td>
+                    <td style="padding:10px;">${Security.escapeHtml(c.specialties || '-')}</td>
+                    <td style="padding:10px;color:#999;font-size:13px;">${Security.escapeHtml(c.deleted_at)}</td>
                     <td style="padding:10px;white-space:nowrap;">
                         <button onclick="restoreClinic(${c.id})"
                             style="background:#27ae60;color:white;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px;margin-right:6px;">
                             還原
                         </button>
-                        <button onclick="permanentDeleteClinic(${c.id}, '${c.name.replace(/'/g, "\\'")}' )"
+                        <button data-name="${Security.escapeHtml(c.name)}" onclick="permanentDeleteClinic(${c.id}, this.dataset.name)"
                             style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:13px;">
                             🗑️ 永久刪除
                         </button>
@@ -1976,7 +1980,7 @@
                 const data = await res.json();
                 renderDuplicates(data);
             } catch(e) {
-                content.innerHTML = `<p style="color:red;text-align:center;padding:20px;">載入失敗：${e.message}</p>`;
+                content.innerHTML = `<p style="color:red;text-align:center;padding:20px;">載入失敗：${Security.escapeHtml(e.message)}</p>`;
             }
         }
 
@@ -1989,7 +1993,7 @@
             }
             let html = `<div style="border:1px solid #eee;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
                 <div style="font-weight:600;color:#333;margin-bottom:8px;display:flex;align-items:center;">
-                    ${groupLabel}
+                    ${Security.escapeHtml(groupLabel)}
                     <span style="color:#999;font-size:13px;font-weight:400;margin-left:6px;">（共 ${clinics.length} 筆）</span>
                     ${mergeBtn}
                 </div>`;
@@ -1997,9 +2001,9 @@
                 html += `<div style="display:flex;align-items:center;justify-content:space-between;
                                      padding:7px 0;border-top:1px solid #f5f5f5;">
                     <div style="font-size:14px;">
-                        ${showName ? `<strong>${c.name}</strong>　` : ''}
-                        <span style="color:#555;">${c.region}${c.district}</span>
-                        <span style="color:#999;margin-left:10px;">${c.phone || '（無電話）'}</span>
+                        ${showName ? `<strong>${Security.escapeHtml(c.name)}</strong>　` : ''}
+                        <span style="color:#555;">${Security.escapeHtml(c.region)}${Security.escapeHtml(c.district)}</span>
+                        <span style="color:#999;margin-left:10px;">${Security.escapeHtml(c.phone || '（無電話）')}</span>
                         <span style="color:#bbb;font-size:12px;margin-left:6px;">id:${c.id}</span>
                     </div>
                     <button onclick="deleteDuplicateClinic(${c.id})"
@@ -2024,9 +2028,9 @@
         function showMergeModal(idA, nameA, idB, nameB, locationA, phoneA, locationB, phoneB) {
             document.getElementById('mergeModal').style.display = 'flex';
             document.getElementById('mergeOptionA').innerHTML =
-                `<strong>${nameA}</strong><br><span style="font-size:13px;color:#777;">${locationA}　${phoneA || '無電話'}</span><br><span style="font-size:12px;color:#aaa;">id:${idA}</span>`;
+                `<strong>${Security.escapeHtml(nameA)}</strong><br><span style="font-size:13px;color:#777;">${Security.escapeHtml(locationA)}　${Security.escapeHtml(phoneA || '無電話')}</span><br><span style="font-size:12px;color:#aaa;">id:${idA}</span>`;
             document.getElementById('mergeOptionB').innerHTML =
-                `<strong>${nameB}</strong><br><span style="font-size:13px;color:#777;">${locationB}　${phoneB || '無電話'}</span><br><span style="font-size:12px;color:#aaa;">id:${idB}</span>`;
+                `<strong>${Security.escapeHtml(nameB)}</strong><br><span style="font-size:13px;color:#777;">${Security.escapeHtml(locationB)}　${Security.escapeHtml(phoneB || '無電話')}</span><br><span style="font-size:12px;color:#aaa;">id:${idB}</span>`;
             document.getElementById('mergeOptionA').dataset.id = idA;
             document.getElementById('mergeOptionB').dataset.id = idB;
             // 動態綁定 onclick（避免 innerHTML 刷新後失效）

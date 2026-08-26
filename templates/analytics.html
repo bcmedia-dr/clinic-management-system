@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <script src="{{ url_for('static', filename='security.js') }}"></script>
     <title>統計分析 - Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -136,7 +138,7 @@
             <div class="header-right">
                 <button class="btn-logout" id="darkBtn" onclick="toggleDark()">🌙 深色</button>
                 <button class="btn-logout" onclick="exportPDF()" id="btnPdf">📄 匯出 PDF</button>
-                <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+                <button class="btn-logout" onclick="secureLogout()">🚪 登出</button>
             </div>
         </div>
         <div class="nav">
@@ -490,8 +492,10 @@
 
             } catch (err) {
                 console.error('載入統計失敗:', err);
-                document.querySelector('.container').innerHTML +=
-                    '<div style="color:red;padding:20px;">載入統計資料失敗：' + err.message + '</div>';
+                const errorBox = document.createElement('div');
+                errorBox.style.cssText = 'color:red;padding:20px;';
+                errorBox.textContent = '載入統計資料失敗：' + err.message;
+                document.querySelector('.container').appendChild(errorBox);
             }
         }
 

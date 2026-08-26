@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <script src="{{ url_for('static', filename='security.js') }}"></script>
     <title>活動比對 - Bcmedia 診所管理系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -202,7 +204,7 @@
         </div>
         <div style="display:flex;gap:8px;">
             <button class="btn-logout" id="darkBtn" onclick="toggleDark()">🌙 深色</button>
-            <button class="btn-logout" onclick="window.location.href='/logout'">🚪 登出</button>
+            <button class="btn-logout" onclick="secureLogout()">🚪 登出</button>
         </div>
     </div>
     <div class="nav">
@@ -363,10 +365,11 @@
                 return;
             }
             list.innerHTML = data.map(function(h) {
-                return '<div class="history-item" onclick="loadHistoryResult(' + h.id + ')">' +
+                var id = Number(h.id);
+                return '<div class="history-item" onclick="loadHistoryResult(' + id + ')">' +
                     '<div>' +
-                        '<strong>' + (h.campaign_name || '未命名') + '</strong>' +
-                        '<div class="history-meta">' + h.created_at + '</div>' +
+                        '<strong>' + Security.escapeHtml(h.campaign_name || '未命名') + '</strong>' +
+                        '<div class="history-meta">' + Security.escapeHtml(h.created_at || '') + '</div>' +
                     '</div>' +
                     '<div style="display:flex;align-items:center;gap:8px;">' +
                         '<div class="history-counts">' +
@@ -374,7 +377,7 @@
                             '<span class="hc-red">' + h.not_joined_count + '</span>' +
                             '<span class="hc-yellow">' + h.not_in_system_count + '</span>' +
                         '</div>' +
-                        '<button class="btn-del-history" onclick="event.stopPropagation();deleteHistory(' + h.id + ')" title="刪除">×</button>' +
+                        '<button class="btn-del-history" onclick="event.stopPropagation();deleteHistory(' + id + ')" title="刪除">×</button>' +
                     '</div>' +
                 '</div>';
             }).join('');
@@ -523,17 +526,17 @@
         }
         filtered.forEach(function(c, i) {
             var specTags = (c.specialties || '').split(',').filter(Boolean)
-                .map(function(s) { return '<span class="specialty-tag">' + s.trim() + '</span>'; }).join('');
+                .map(function(s) { return '<span class="specialty-tag">' + Security.escapeHtml(s.trim()) + '</span>'; }).join('');
             var tr = document.createElement('tr');
             tr.innerHTML =
                 '<td>' + (i + 1) + '</td>' +
-                '<td>' + (c.region || '') + '</td>' +
-                '<td>' + (c.district || '') + '</td>' +
-                '<td><strong>' + (c.name || '') + '</strong></td>' +
+                '<td>' + Security.escapeHtml(c.region || '') + '</td>' +
+                '<td>' + Security.escapeHtml(c.district || '') + '</td>' +
+                '<td><strong>' + Security.escapeHtml(c.name || '') + '</strong></td>' +
                 '<td class="specialty">' + (specTags || '-') + '</td>' +
-                '<td title="' + (c.address || '') + '">' + (c.address || '-') + '</td>' +
-                '<td>' + (c.phone || '') + '</td>' +
-                '<td>' + (c.contact_person || '') + '</td>';
+                '<td title="' + Security.escapeHtml(c.address || '') + '">' + Security.escapeHtml(c.address || '-') + '</td>' +
+                '<td>' + Security.escapeHtml(c.phone || '') + '</td>' +
+                '<td>' + Security.escapeHtml(c.contact_person || '') + '</td>';
             tbody.appendChild(tr);
         });
     }
@@ -550,10 +553,10 @@
             var cells = keys.map(function(k) {
                 if (k === 'specialties') {
                     var tags = (c[k] || '').split(',').filter(Boolean)
-                        .map(function(s) { return '<span class="specialty-tag">' + s.trim() + '</span>'; }).join('');
+                        .map(function(s) { return '<span class="specialty-tag">' + Security.escapeHtml(s.trim()) + '</span>'; }).join('');
                     return '<td class="specialty">' + (tags || '-') + '</td>';
                 }
-                return '<td>' + (c[k] || '') + '</td>';
+                return '<td>' + Security.escapeHtml(c[k] || '') + '</td>';
             }).join('');
             tr.innerHTML = '<td>' + (i + 1) + '</td>' + cells;
             tbody.appendChild(tr);
@@ -570,10 +573,10 @@
         rows.forEach(function(c, i) {
             tbody.innerHTML +=
                 '<tr><td>' + (i + 1) + '</td>' +
-                '<td>' + (c.region || '') + '</td>' +
-                '<td>' + (c.district || '') + '</td>' +
-                '<td><strong>' + (c.name || '') + '</strong></td>' +
-                '<td>' + (c.phone || '') + '</td></tr>';
+                '<td>' + Security.escapeHtml(c.region || '') + '</td>' +
+                '<td>' + Security.escapeHtml(c.district || '') + '</td>' +
+                '<td><strong>' + Security.escapeHtml(c.name || '') + '</strong></td>' +
+                '<td>' + Security.escapeHtml(c.phone || '') + '</td></tr>';
         });
     }
 
